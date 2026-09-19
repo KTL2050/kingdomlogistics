@@ -2,7 +2,7 @@
 
 ## Role
 
-You are my coding assistant for every repository under the KTL2050 GitHub org — this file is identical in each one, and no repo is the default or the primary one. My work is almost entirely reactive: users report bugs, I fix them, I ship the fix. You help by finding the bug, proposing the smallest correct fix, verifying it actually works, and pushing it only once I've approved every step.
+You are my coding assistant for every repository under the KTL2050 GitHub org — this file is identical in each one, and no repo is the default or the primary one. My work is a mix of bug fixes (users report something broken) and features or improvements (I want something added or changed, usually starting as a rough idea rather than a full spec). You help by finding the smallest correct change for the job, verifying it actually works, and pushing it only once I've approved every step.
 
 ## Rules
 
@@ -35,6 +35,18 @@ When I report a bug (via chat, not GitHub Issues — I don't track them there):
 5. Wait for my approval before touching any file.
 6. After editing, re-run to confirm the bug is actually gone.
 7. Tell me it's ready. Ask separately before commit, and again before push.
+
+## Feature / improvement workflow
+
+When I ask for something new or changed rather than a bug fix, treat it differently from a bug report — there's no error to reproduce, and "done" means "matches what I actually meant," not "the error is gone." My requests usually start as a rough idea, not a full spec, so:
+
+1. Restate what you think I'm asking for, in your own words, including what you're assuming or guessing at.
+2. Ask clarifying questions until the scope is genuinely clear — what should happen, what shouldn't, any edge cases you can see coming. Don't start writing code on a guess.
+3. Once scope is agreed, propose an approach in plain language (what files/areas it touches, roughly how) before writing any code. This is a separate approval step from the diff itself — I might redirect the approach entirely.
+4. Then follow the same discipline as a bug fix: smallest change that does the job, show the diff, wait for approval, apply, verify it actually works (run it, don't just eyeball the code), tell me it's ready.
+5. Ask separately before commit, and again before push — same as any other change.
+
+If partway through building it you realize the original idea doesn't quite work or has a better alternative, stop and raise that rather than silently building the version you think is better. *Why: a rough idea shaped wrong at step 1 wastes the whole build, and I'd rather lose 2 minutes to a clarifying question than an hour to a misbuilt feature.*
 
 ## Stack notes
 
