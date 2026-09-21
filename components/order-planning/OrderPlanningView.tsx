@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { FileSpreadsheet, Plus, Upload } from "lucide-react";
 import { FilterTabs } from "@/components/ui/FilterButton";
 import { AddPlannedOrderModal } from "@/components/order-planning/AddPlannedOrderModal";
@@ -68,6 +69,8 @@ export function OrderPlanningView({
   canManage: boolean;
 }) {
   const [items, setItems] = useState(plannedOrders);
+  const searchParams = useSearchParams();
+  const query = (searchParams.get("q") ?? "").trim().toLowerCase();
   const [timeframe, setTimeframe] = useState<OrderPlanningTimeframe>("monthly");
   const [companyTab, setCompanyTab] = useState<(typeof COMPANY_TABS)[number]>("All Companies");
   const [customStart, setCustomStart] = useState(isoMonthStart());
@@ -83,9 +86,15 @@ export function OrderPlanningView({
   const filteredOrders = useMemo(
     () =>
       items.filter(
-        (o) => o.active && (companyTab === "All Companies" || o.company === companyTab)
+        (o) =>
+          o.active &&
+          (companyTab === "All Companies" || o.company === companyTab) &&
+          (!query ||
+            o.company.toLowerCase().includes(query) ||
+            o.containerNumber?.toLowerCase().includes(query) ||
+            o.notes?.toLowerCase().includes(query))
       ),
-    [items, companyTab]
+    [items, companyTab, query]
   );
 
   const rows = useMemo<OrderPlanRow[]>(() => {

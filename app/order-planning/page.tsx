@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/AppShell";
 import { OrderPlanningView } from "@/components/order-planning/OrderPlanningView";
 import { getCurrentUser, getPlannedOrders, getShipments } from "@/lib/data";
@@ -10,6 +11,8 @@ export default async function OrderPlanningPage() {
     getShipments(),
     getCurrentUser(),
   ]);
+
+  if (user?.role === "Viewer") redirect("/");
 
   return (
     <AppShell

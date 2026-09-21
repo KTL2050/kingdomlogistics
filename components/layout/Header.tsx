@@ -4,10 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, ChevronDown, LogOut, Menu, Settings } from "lucide-react";
 import Link from "next/link";
-import { SearchBar } from "@/components/ui/SearchBar";
+import { HeaderSearch } from "@/components/layout/HeaderSearch";
 import { formatUpdatedAt } from "@/lib/utils";
 import { supabase } from "@/lib/supabase/client";
-import type { Alert } from "@/types";
+import type { Alert, Shipment } from "@/types";
 
 export function Header({
   breadcrumb,
@@ -18,6 +18,7 @@ export function Header({
   alerts = [],
   onMenuClick,
   headerAction,
+  shipments,
 }: {
   breadcrumb: string;
   title: string;
@@ -27,6 +28,7 @@ export function Header({
   alerts?: Alert[];
   onMenuClick?: () => void;
   headerAction?: React.ReactNode;
+  shipments: Shipment[];
 }) {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -89,7 +91,7 @@ export function Header({
             Last updated: {formatUpdatedAt()} EAT
           </div>
 
-          <SearchBar />
+          <HeaderSearch shipments={shipments} />
 
           <div className="relative" ref={notifRef}>
             <button

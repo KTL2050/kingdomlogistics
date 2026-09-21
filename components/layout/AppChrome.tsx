@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
-import type { Alert } from "@/types";
+import type { Alert, Shipment } from "@/types";
 
 export function AppChrome({
   breadcrumb,
@@ -14,6 +14,7 @@ export function AppChrome({
   alerts,
   orderPlanningDueCount = 0,
   headerAction,
+  shipments,
   children,
 }: {
   breadcrumb: string;
@@ -24,6 +25,7 @@ export function AppChrome({
   alerts: Alert[];
   orderPlanningDueCount?: number;
   headerAction?: React.ReactNode;
+  shipments: Shipment[];
   children: React.ReactNode;
 }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -47,6 +49,7 @@ export function AppChrome({
           alertCount={alerts.length}
           orderPlanningDueCount={orderPlanningDueCount}
           onCloseMobile={() => setMobileNavOpen(false)}
+          userRole={userRole}
         />
       </div>
 
@@ -60,6 +63,7 @@ export function AppChrome({
           alerts={alerts}
           onMenuClick={() => setMobileNavOpen(true)}
           headerAction={headerAction}
+          shipments={shipments}
         />
         <main className="flex-1 px-4 py-4 sm:px-6">{children}</main>
       </div>

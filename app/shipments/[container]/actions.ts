@@ -8,7 +8,7 @@ import { getRouteStepsForContainer } from "@/lib/mock-data";
 import { computePlannedDates } from "@/lib/planning";
 import { buildDelayReason } from "@/lib/delay";
 import { buildWaypoints } from "@/lib/waypoints";
-import { getShipments } from "@/lib/data";
+import { getCurrentUser, getShipments } from "@/lib/data";
 import type { Milestone } from "@/types";
 
 export async function syncTracking({
@@ -179,6 +179,11 @@ export async function refreshActiveTracking(): Promise<{
   failed: number;
   errors: string[];
 }> {
+  const user = await getCurrentUser();
+  if (!user || user.role === "Viewer") {
+    return { attempted: 0, refreshed: 0, failed: 0, errors: ["Not authorized."] };
+  }
+
   const shipments = await getShipments();
   const targets = shipments.filter(
     (s) =>

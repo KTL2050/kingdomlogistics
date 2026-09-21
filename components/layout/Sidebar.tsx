@@ -30,13 +30,17 @@ export function Sidebar({
   alertCount = 0,
   orderPlanningDueCount = 0,
   onCloseMobile,
+  userRole,
 }: {
   alertCount?: number;
   orderPlanningDueCount?: number;
   onCloseMobile?: () => void;
+  userRole?: string;
 }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const navItems =
+    userRole === "Viewer" ? NAV_ITEMS.filter((item) => item.href !== "/order-planning") : NAV_ITEMS;
 
   return (
     <aside
@@ -69,7 +73,7 @@ export function Sidebar({
       </div>
 
       <nav className="mt-2 flex-1 space-y-0.5 px-3">
-        {NAV_ITEMS.map((item) => {
+        {navItems.map((item) => {
           const isActive =
             item.href === "/" ? pathname === "/" : pathname?.startsWith(item.href);
           const Icon = item.icon;

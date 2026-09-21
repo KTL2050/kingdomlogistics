@@ -17,13 +17,14 @@ export default async function ContainersPage() {
     getCurrentUser(),
   ]);
   const canAddNote = Boolean(user && canManageStageDurations(user.role));
+  const canRefresh = Boolean(user && user.role !== "Viewer");
 
   return (
     <AppShell
       breadcrumb="Logistics / Container Tracking"
       title="Shipment Control Tower"
       subtitle="Real-time visibility of container shipments"
-      headerAction={<RefreshActiveButton />}
+      headerAction={canRefresh ? <RefreshActiveButton /> : undefined}
     >
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
