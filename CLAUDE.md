@@ -34,8 +34,7 @@ When I report a bug (via chat, not GitHub Issues — I don't track them there):
 4. Propose the smallest fix that addresses it. Show me the diff before applying.
 5. Wait for my approval before touching any file.
 6. After editing, re-run to confirm the bug is actually gone.
-7. You apply the changes all to the respective code files but you inform me
-8. Tell me it's ready. Ask separately before commit, and again before push.
+7. Tell me it's ready. Ask separately before commit, and again before push.
 
 ## Feature / improvement workflow
 
