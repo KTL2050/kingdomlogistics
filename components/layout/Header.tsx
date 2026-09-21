@@ -17,6 +17,7 @@ export function Header({
   userRole,
   alerts = [],
   onMenuClick,
+  headerAction,
 }: {
   breadcrumb: string;
   title: string;
@@ -25,6 +26,7 @@ export function Header({
   userRole: string;
   alerts?: Alert[];
   onMenuClick?: () => void;
+  headerAction?: React.ReactNode;
 }) {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -81,6 +83,7 @@ export function Header({
         </div>
 
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          {headerAction}
           <div className="hidden shrink-0 items-center gap-1.5 whitespace-nowrap text-[12.5px] text-text-secondary xl:flex">
             <span className="h-1.5 w-1.5 rounded-full bg-success" />
             Last updated: {formatUpdatedAt()} EAT

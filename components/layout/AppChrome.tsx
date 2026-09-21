@@ -13,6 +13,7 @@ export function AppChrome({
   userRole,
   alerts,
   orderPlanningDueCount = 0,
+  headerAction,
   children,
 }: {
   breadcrumb: string;
@@ -22,6 +23,7 @@ export function AppChrome({
   userRole: string;
   alerts: Alert[];
   orderPlanningDueCount?: number;
+  headerAction?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -57,6 +59,7 @@ export function AppChrome({
           userRole={userRole}
           alerts={alerts}
           onMenuClick={() => setMobileNavOpen(true)}
+          headerAction={headerAction}
         />
         <main className="flex-1 px-4 py-4 sm:px-6">{children}</main>
       </div>

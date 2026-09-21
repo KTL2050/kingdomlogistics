@@ -8,11 +8,13 @@ export async function AppShell({
   breadcrumb,
   title,
   subtitle,
+  headerAction,
   children,
 }: {
   breadcrumb: string;
   title: string;
   subtitle: string;
+  headerAction?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const user = await getCurrentUser();
@@ -38,6 +40,7 @@ export async function AppShell({
       userRole={user.role}
       alerts={unacknowledged}
       orderPlanningDueCount={orderPlanningDueCount}
+      headerAction={headerAction}
     >
       {children}
     </AppChrome>

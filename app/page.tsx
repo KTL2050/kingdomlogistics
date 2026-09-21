@@ -1,6 +1,7 @@
 import { Boxes, CheckCircle2, Clock, Hourglass } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { KpiCard } from "@/components/dashboard/KpiCard";
+import { RefreshActiveButton } from "@/components/dashboard/RefreshActiveButton";
 import { ShipmentStatusPanel } from "@/components/dashboard/ShipmentStatusPanel";
 import { AlertsPanel } from "@/components/dashboard/AlertsPanel";
 import { TrackingMap } from "@/components/dashboard/TrackingMap";
@@ -22,6 +23,7 @@ export default async function ContainersPage() {
       breadcrumb="Logistics / Container Tracking"
       title="Shipment Control Tower"
       subtitle="Real-time visibility of container shipments"
+      headerAction={<RefreshActiveButton />}
     >
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard

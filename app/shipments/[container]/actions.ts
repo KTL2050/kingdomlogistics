@@ -8,9 +8,31 @@ import { getRouteStepsForContainer } from "@/lib/mock-data";
 import { computePlannedDates } from "@/lib/planning";
 import { buildDelayReason } from "@/lib/delay";
 import { buildWaypoints } from "@/lib/waypoints";
+import { getShipments } from "@/lib/data";
 import type { Milestone } from "@/types";
 
 export async function syncTracking({
+  shipmentId,
+  containerNumber,
+  reference,
+  referenceType,
+}: {
+  shipmentId: string;
+  containerNumber: string;
+  reference: string;
+  referenceType: "container" | "bl";
+}): Promise<{ success: true } | { error: string }> {
+  const result = await syncShipmentTracking({ shipmentId, containerNumber, reference, referenceType });
+  if ("success" in result) {
+    revalidatePath(`/shipments/${containerNumber}`);
+    revalidatePath("/");
+    revalidatePath("/overview");
+    revalidatePath("/alerts");
+  }
+  return result;
+}
+
+async function syncShipmentTracking({
   shipmentId,
   containerNumber,
   reference,
@@ -144,13 +166,55 @@ export async function syncTracking({
       });
     }
 
-    revalidatePath(`/shipments/${containerNumber}`);
-    revalidatePath("/");
-    revalidatePath("/overview");
-    revalidatePath("/alerts");
     return { success: true };
   } catch (e) {
     if (e instanceof TraqoError) return { error: e.message };
     return { error: "Something went wrong reaching the tracking service." };
   }
+}
+
+export async function refreshActiveTracking(): Promise<{
+  attempted: number;
+  refreshed: number;
+  failed: number;
+  errors: string[];
+}> {
+  const shipments = await getShipments();
+  const targets = shipments.filter(
+    (s) =>
+      (s.health === "on_time" || s.health === "delayed") &&
+      s.trackingReference &&
+      s.trackingReferenceType
+  );
+
+  const results = await Promise.allSettled(
+    targets.map((s) =>
+      syncShipmentTracking({
+        shipmentId: s.id,
+        containerNumber: s.containerNumber,
+        reference: s.trackingReference!,
+        referenceType: s.trackingReferenceType!,
+      })
+    )
+  );
+
+  const errors: string[] = [];
+  let refreshed = 0;
+  results.forEach((r, i) => {
+    if (r.status === "fulfilled" && "success" in r.value) {
+      refreshed++;
+    } else {
+      const message = r.status === "fulfilled" && "error" in r.value ? r.value.error : "Unexpected error.";
+      errors.push(`${targets[i].containerNumber}: ${message}`);
+    }
+  });
+
+  targets.forEach((s) => revalidatePath(`/shipments/${s.containerNumber}`));
+  if (refreshed > 0) {
+    revalidatePath("/");
+    revalidatePath("/overview");
+    revalidatePath("/alerts");
+  }
+
+  return { attempted: targets.length, refreshed, failed: targets.length - refreshed, errors };
 }
