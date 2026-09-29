@@ -72,7 +72,6 @@ export const shipments: Shipment[] = [
     health: "delayed",
     delayDays: 5,
     customer: "Uncle Bills",
-    assignedManager: "David Mwangi",
     position: { lat: 0.3336, lng: 32.6089, label: "Kampala ICD" },
     delayReason:
       "ICD arrival delayed — 5 days behind plan. Due to increased port congestion and customs clearance backlog.",
@@ -110,7 +109,6 @@ export const shipments: Shipment[] = [
     health: "on_time",
     delayDays: 0,
     customer: "Uncle Bills",
-    assignedManager: "David Mwangi",
     position: { lat: -1.7, lng: 37.3, label: "Inland Transport" },
     milestones: buildMilestones(
       ROUTE_STEPS_ICD,
@@ -145,7 +143,6 @@ export const shipments: Shipment[] = [
     health: "delayed",
     delayDays: 2,
     customer: "Uncle Bills",
-    assignedManager: "David Mwangi",
     position: { lat: 8.5, lng: 68.2, label: "Indian Ocean" },
     delayReason:
       "Vessel schedule slipped 2 days at transshipment port. No customer action required yet.",
@@ -183,7 +180,6 @@ export const shipments: Shipment[] = [
     health: "delayed",
     delayDays: 1,
     customer: "Uncle Bills",
-    assignedManager: "David Mwangi",
     position: { lat: -1.2, lng: 36.9, label: "Inland Transport" },
     delayReason: "Border clearance at Malaba took longer than scheduled.",
     delayReportedAt: "2024-04-24 09:05 EAT",
@@ -220,7 +216,6 @@ export const shipments: Shipment[] = [
     health: "completed",
     delayDays: 0,
     customer: "Aiwibi Uganda",
-    assignedManager: "David Mwangi",
     position: { lat: 0.317, lng: 32.582, label: "Kampala Store" },
     // Aiwibi Uganda containers skip Kampala ICD entirely — 6 steps, not 7.
     milestones: buildMilestones(
@@ -255,7 +250,6 @@ export const shipments: Shipment[] = [
     health: "on_time",
     delayDays: 0,
     customer: "Uncle Bills",
-    assignedManager: "David Mwangi",
     position: { lat: 14.2, lng: 62.4, label: "Arabian Sea" },
     milestones: buildMilestones(
       ROUTE_STEPS_ICD,
@@ -290,7 +284,6 @@ export const shipments: Shipment[] = [
     health: "completed",
     delayDays: 0,
     customer: "Uncle Bills",
-    assignedManager: "David Mwangi",
     position: { lat: 0.317, lng: 32.582, label: "Kampala Store" },
     milestones: buildMilestones(
       ROUTE_STEPS_ICD,
@@ -325,7 +318,6 @@ export const shipments: Shipment[] = [
     health: "completed",
     delayDays: 0,
     customer: "Uncle Bills",
-    assignedManager: "David Mwangi",
     position: { lat: 0.317, lng: 32.582, label: "Kampala Store" },
     milestones: buildMilestones(
       ROUTE_STEPS_ICD,
@@ -360,7 +352,6 @@ export const shipments: Shipment[] = [
     health: "on_time",
     delayDays: 0,
     customer: "Uncle Bills",
-    assignedManager: "David Mwangi",
     position: { lat: 30.7, lng: 122.1, label: "Shanghai Port" },
     milestones: buildMilestones(
       ROUTE_STEPS_ICD,
@@ -395,7 +386,6 @@ export const shipments: Shipment[] = [
     health: "delayed",
     delayDays: 2,
     customer: "Uncle Bills",
-    assignedManager: "David Mwangi",
     position: { lat: -4.05, lng: 39.66, label: "Mombasa Port" },
     delayReason: "Port congestion at Mombasa is holding container handling.",
     delayReportedAt: "2024-04-26 07:40 EAT",
@@ -432,7 +422,6 @@ export const shipments: Shipment[] = [
     health: "not_started",
     delayDays: 0,
     customer: "Aiwibi Uganda",
-    assignedManager: "David Mwangi",
     position: { lat: 23.1, lng: 113.3, label: "Guangzhou Warehouse" },
     // Aiwibi Uganda containers skip Kampala ICD entirely — 6 steps, not 7.
     milestones: buildMilestones(
