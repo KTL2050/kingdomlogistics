@@ -31,7 +31,7 @@ export function MilestoneTimeline({ shipment }: { shipment: Shipment }) {
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-x-8 gap-y-2 text-xs">
+        <div className="flex flex-wrap items-start gap-x-8 gap-y-2 text-xs">
           <div>
             <div className="text-text-tertiary">Container Size</div>
             <div className="font-medium text-text-primary">
@@ -62,12 +62,15 @@ export function MilestoneTimeline({ shipment }: { shipment: Shipment }) {
               })}
             </div>
           </div>
-        </div>
-
-        <div className="text-right">
-          <StatusBadge health={shipment.health} delayDays={shipment.delayDays} />
-          <div className="mt-1 text-[11px] text-text-tertiary">
-            {shipment.health === "delayed" ? "Behind schedule" : "On schedule"}
+          {/* Kept in the same flex-wrap flow as the fields above (rather
+              than a separate flex item) so it lands right after Final ETA
+              on whichever line has room, instead of always dropping to
+              its own row on narrow screens. */}
+          <div className="text-right">
+            <StatusBadge health={shipment.health} delayDays={shipment.delayDays} />
+            <div className="mt-1 text-[11px] text-text-tertiary">
+              {shipment.health === "delayed" ? "Behind schedule" : "On schedule"}
+            </div>
           </div>
         </div>
       </div>

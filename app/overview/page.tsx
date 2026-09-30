@@ -32,10 +32,10 @@ export default async function OverviewPage() {
       subtitle="A snapshot of shipment performance across your network"
     >
       <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-1 sm:grid sm:grid-cols-2 sm:overflow-visible sm:pb-0 xl:grid-cols-4">
-        <div className="shrink-0 basis-[calc(50%-8px)] snap-start sm:basis-auto">
+        <div className="min-w-0 shrink-0 basis-[calc(50%-8px)] snap-start sm:basis-auto">
           <KpiCard icon={Boxes} label="Total Containers" value={kpi.total} supporting="All shipments" tone="accent" />
         </div>
-        <div className="shrink-0 basis-[calc(50%-8px)] snap-start sm:basis-auto">
+        <div className="min-w-0 shrink-0 basis-[calc(50%-8px)] snap-start sm:basis-auto">
           <KpiCard
             icon={CheckCircle2}
             label="On Time"
@@ -44,7 +44,7 @@ export default async function OverviewPage() {
             tone="success"
           />
         </div>
-        <div className="shrink-0 basis-[calc(50%-8px)] snap-start sm:basis-auto">
+        <div className="min-w-0 shrink-0 basis-[calc(50%-8px)] snap-start sm:basis-auto">
           <KpiCard
             icon={Clock}
             label="Delayed"
@@ -53,7 +53,7 @@ export default async function OverviewPage() {
             tone="danger"
           />
         </div>
-        <div className="shrink-0 basis-[calc(50%-8px)] snap-start sm:basis-auto">
+        <div className="min-w-0 shrink-0 basis-[calc(50%-8px)] snap-start sm:basis-auto">
           <KpiCard
             icon={Hourglass}
             label="Not Started"
