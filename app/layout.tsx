@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "@fontsource/inter/400.css";
 import "@fontsource/inter/500.css";
 import "@fontsource/inter/600.css";
@@ -11,6 +11,20 @@ export const metadata: Metadata = {
   icons: {
     icon: "https://ik.imagekit.io/6kafqkidx/logome.png",
   },
+};
+
+// Without this, mobile browsers allow native pinch-zoom anywhere on the
+// page (there's no touch-action restriction outside the Leaflet map,
+// which handles its own gestures) — an accidental pinch zooms the whole
+// visual viewport and pans everything together, header included, which
+// is what looked like the header "not staying fixed" on mobile. The map
+// already has its own +/- zoom buttons (see ZoomControls in
+// TrackingMapInner.tsx), so this doesn't remove any real functionality.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 // This is a live operations dashboard — every page reads current

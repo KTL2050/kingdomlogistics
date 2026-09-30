@@ -31,29 +31,37 @@ export default async function OverviewPage() {
       title="Overview"
       subtitle="A snapshot of shipment performance across your network"
     >
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard icon={Boxes} label="Total Containers" value={kpi.total} supporting="All shipments" tone="accent" />
-        <KpiCard
-          icon={CheckCircle2}
-          label="On Time"
-          value={kpi.onTime}
-          supporting={`${((kpi.onTime / kpi.total) * 100).toFixed(1)}% of total`}
-          tone="success"
-        />
-        <KpiCard
-          icon={Clock}
-          label="Delayed"
-          value={kpi.delayed}
-          supporting={`Avg. ${avgDelay.toFixed(1)} days late`}
-          tone="danger"
-        />
-        <KpiCard
-          icon={Hourglass}
-          label="Not Started"
-          value={kpi.notStarted}
-          supporting={`${((kpi.notStarted / kpi.total) * 100).toFixed(1)}% of total`}
-          tone="warning"
-        />
+      <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-1 sm:grid sm:grid-cols-2 sm:overflow-visible sm:pb-0 xl:grid-cols-4">
+        <div className="shrink-0 basis-[calc(50%-8px)] snap-start sm:basis-auto">
+          <KpiCard icon={Boxes} label="Total Containers" value={kpi.total} supporting="All shipments" tone="accent" />
+        </div>
+        <div className="shrink-0 basis-[calc(50%-8px)] snap-start sm:basis-auto">
+          <KpiCard
+            icon={CheckCircle2}
+            label="On Time"
+            value={kpi.onTime}
+            supporting={`${((kpi.onTime / kpi.total) * 100).toFixed(1)}% of total`}
+            tone="success"
+          />
+        </div>
+        <div className="shrink-0 basis-[calc(50%-8px)] snap-start sm:basis-auto">
+          <KpiCard
+            icon={Clock}
+            label="Delayed"
+            value={kpi.delayed}
+            supporting={`Avg. ${avgDelay.toFixed(1)} days late`}
+            tone="danger"
+          />
+        </div>
+        <div className="shrink-0 basis-[calc(50%-8px)] snap-start sm:basis-auto">
+          <KpiCard
+            icon={Hourglass}
+            label="Not Started"
+            value={kpi.notStarted}
+            supporting={`${((kpi.notStarted / kpi.total) * 100).toFixed(1)}% of total`}
+            tone="warning"
+          />
+        </div>
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1fr_320px]">
