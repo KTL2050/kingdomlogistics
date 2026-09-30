@@ -85,7 +85,6 @@ export function Header({
         </div>
 
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-          {headerAction}
           <div className="hidden shrink-0 items-center gap-1.5 whitespace-nowrap text-[12.5px] text-text-secondary xl:flex">
             <span className="h-1.5 w-1.5 rounded-full bg-success" />
             Last updated: {formatUpdatedAt()} EAT
@@ -170,7 +169,7 @@ export function Header({
             </button>
 
             {menuOpen && (
-              <div className="absolute right-0 top-[calc(100%+6px)] z-50 w-44 overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-lg">
+              <div className="absolute right-0 top-[calc(100%+6px)] z-50 w-56 overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-lg">
                 <Link
                   href="/settings"
                   onClick={() => setMenuOpen(false)}
@@ -179,13 +178,16 @@ export function Header({
                   <Settings className="h-3.5 w-3.5" />
                   Settings
                 </Link>
-                <button
-                  onClick={handleSignOut}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12.5px] text-danger hover:bg-page"
-                >
-                  <LogOut className="h-3.5 w-3.5" />
-                  Sign out
-                </button>
+                {headerAction && <div className="border-t border-border">{headerAction}</div>}
+                <div className="border-t border-border">
+                  <button
+                    onClick={handleSignOut}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12.5px] text-danger hover:bg-page"
+                  >
+                    <LogOut className="h-3.5 w-3.5" />
+                    Sign out
+                  </button>
+                </div>
               </div>
             )}
           </div>

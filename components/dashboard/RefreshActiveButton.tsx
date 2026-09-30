@@ -23,16 +23,16 @@ export function RefreshActiveButton() {
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div>
       <button
         onClick={handleClick}
         disabled={loading}
-        className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-[12.5px] font-medium text-text-secondary hover:bg-page disabled:opacity-50"
+        className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12.5px] text-text-secondary hover:bg-page hover:text-text-primary disabled:opacity-50"
       >
         <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
         Refresh status
       </button>
-      {summary && <span className="text-[12px] text-text-tertiary">{summary}</span>}
+      {summary && <p className="px-3 pb-1.5 text-[11px] text-text-tertiary">{summary}</p>}
     </div>
   );
 }
