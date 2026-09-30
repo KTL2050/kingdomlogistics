@@ -1,26 +1,72 @@
 import { getCompanyForContainer } from "@/lib/utils";
-import type { OrderFrequency, PlannedOrder } from "@/types";
+import type { ContainerSize, OrderFrequency, PlannedOrder } from "@/types";
 
 /**
- * Maps the header text your spreadsheet actually uses (case/spacing may
- * vary) to the canonical field name this parser works with internally.
+ * Every header wording this parser recognizes for each field, already
+ * normalized (lowercase, no spaces/punctuation) — see normalizeKey().
+ * This is intentionally generous: a real spreadsheet or a PDF-exported
+ * table almost never uses the exact wording you'd design from scratch,
+ * so matching is alias-based first, then falls back to substring
+ * containment (normalizeHeader) rather than requiring an exact hit.
  */
-const HEADER_ALIASES: Record<string, string> = {
-  container: "container",
-  "order date": "orderDate",
-  "order cycle": "orderCycle",
-  cycle: "orderCycle",
-  leadtime: "leadtime",
-  "lead time": "leadtime",
-  "lead-time": "leadtime",
-  "mombasa eta": "mombasaEta",
-  "store date": "storeDate",
-  actual: "actual",
-  status: "status",
+const FIELD_ALIASES: Record<string, string[]> = {
+  container: [
+    "container", "containerno", "containernumber", "containercode",
+    "containerid", "cntr", "cntrno", "cntrnumber",
+  ],
+  size: ["size", "containersize", "ctrsize"],
+  orderDate: [
+    "orderdate", "date", "orderplaced", "placeddate", "dateordered",
+    "duedate", "nextorderdate", "orderdue", "datedue",
+  ],
+  orderCycle: [
+    "ordercycle", "cycle", "frequency", "orderfrequency", "recurrence",
+    "interval", "ordertype",
+  ],
+  leadtime: [
+    "leadtime", "lead", "notice", "noticeperiod", "leaddays", "leaddaysnotice",
+  ],
+  mombasaEta: ["mombasaeta", "etamombasa", "porteta", "eta"],
+  storeDate: [
+    "storedate", "deliverydate", "arrivaldate", "storearrival", "arrivalatstore",
+  ],
+  actual: ["actual", "actualdate", "placedon", "dateplaced", "orderplacedon"],
+  status: ["status", "state"],
+  notes: ["notes", "note", "remarks", "comment", "comments"],
 };
 
+function normalizeKey(raw: string): string {
+  return raw.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+/**
+ * Maps a header cell's raw text to the canonical field name it means, or
+ * undefined if it doesn't look like any recognized field. Tries an exact
+ * alias match first; if that fails, falls back to "does this header
+ * contain a known alias as a substring" (longest alias wins, so e.g. a
+ * header matching both "eta" and "mombasaeta" resolves to the more
+ * specific one) — this is what lets slightly-off real-world wording
+ * ("Container No.", "Order Placed On") still get recognized.
+ */
 export function normalizeHeader(raw: string): string | undefined {
-  return HEADER_ALIASES[raw.trim().toLowerCase()];
+  const key = normalizeKey(raw);
+  if (!key) return undefined;
+
+  for (const [field, aliases] of Object.entries(FIELD_ALIASES)) {
+    if (aliases.includes(key)) return field;
+  }
+
+  let bestField: string | undefined;
+  let bestLen = 0;
+  for (const [field, aliases] of Object.entries(FIELD_ALIASES)) {
+    for (const alias of aliases) {
+      if (key.includes(alias) && alias.length > bestLen) {
+        bestField = field;
+        bestLen = alias.length;
+      }
+    }
+  }
+  return bestField;
 }
 
 // Builds "YYYY-MM-DD" directly from calendar fields — never round-trips
@@ -78,6 +124,12 @@ function parseFlexibleDate(raw: unknown): string | null {
   return null;
 }
 
+const CONTAINER_CODE_PATTERN = /^[A-Za-z]\d{1,5}$/;
+
+function looksLikeContainerCode(text: string): boolean {
+  return CONTAINER_CODE_PATTERN.test(text.trim());
+}
+
 function parseOrderCycle(raw: unknown): { frequency: OrderFrequency; customIntervalDays?: number } {
   const text = String(raw ?? "").trim().toLowerCase();
   if (text.includes("month")) return { frequency: "monthly" };
@@ -94,6 +146,14 @@ function parseLeadtime(raw: unknown): number {
   return days ? Number(days[1]) : 7;
 }
 
+const VALID_SIZES: ContainerSize[] = ["20ft", "40ft", "40ft HC", "45ft"];
+
+function parseContainerSize(raw: unknown): ContainerSize | undefined {
+  const text = String(raw ?? "").trim().toLowerCase().replace(/\s+/g, "");
+  const match = VALID_SIZES.find((s) => s.toLowerCase().replace(/\s+/g, "") === text);
+  return match;
+}
+
 function cleanCell(raw: unknown): string {
   const text = String(raw ?? "").trim();
   return text === "—" || text === "-" ? "" : text;
@@ -106,20 +166,30 @@ export interface ImportRowResult {
 }
 
 /**
- * Turns spreadsheet rows (one plain object per row, already keyed by the
- * canonical field names from normalizeHeader) into PlannedOrder records.
- * Each row becomes its own schedule — if your sheet has one row per
- * currently-active order per container, that's exactly right; if it has
- * full historical rows for the same container, you'll get one schedule
- * per row rather than one merged schedule (see note in the import modal).
+ * Turns parsed rows into PlannedOrder records. `values` holds whatever
+ * was matched by column header; `rawCells` (every cell in the row,
+ * regardless of column) is a fallback for files with no recognizable
+ * header row at all — common for a PDF export, or a spreadsheet someone
+ * hand-formatted differently than expected. When a required field wasn't
+ * found by header, this scans the raw cells for something that looks
+ * like the right shape (a container-code pattern, a parseable date)
+ * before giving up on that row. Each row becomes its own schedule — see
+ * the upload UI's own note about one row per active order vs. full
+ * history for the same container.
  */
 export function buildPlannedOrdersFromRows(
-  rows: { rowNumber: number; values: Record<string, unknown> }[]
+  rows: { rowNumber: number; values: Record<string, unknown>; rawCells?: unknown[] }[]
 ): ImportRowResult[] {
-  return rows.map(({ rowNumber, values }) => {
-    const container = cleanCell(values.container).toUpperCase();
+  return rows.map(({ rowNumber, values, rawCells = [] }) => {
+    let container = cleanCell(values.container).toUpperCase();
     if (!container) {
-      return { rowNumber, error: "Missing Container" };
+      const candidate = rawCells
+        .map((c) => cleanCell(c).toUpperCase())
+        .find((c) => looksLikeContainerCode(c));
+      if (candidate) container = candidate;
+    }
+    if (!container) {
+      return { rowNumber, error: "No container code found in this row" };
     }
 
     const company = getCompanyForContainer(container);
@@ -130,13 +200,23 @@ export function buildPlannedOrdersFromRows(
       };
     }
 
-    const anchorDate = parseFlexibleDate(values.orderDate);
+    let anchorDate = parseFlexibleDate(values.orderDate);
     if (!anchorDate) {
-      return { rowNumber, error: `Couldn't read Order Date "${values.orderDate ?? ""}"` };
+      for (const cell of rawCells) {
+        const parsed = parseFlexibleDate(cell);
+        if (parsed) {
+          anchorDate = parsed;
+          break;
+        }
+      }
+    }
+    if (!anchorDate) {
+      return { rowNumber, error: "No usable date found in this row" };
     }
 
     const { frequency, customIntervalDays } = parseOrderCycle(values.orderCycle);
     const leadTimeDays = parseLeadtime(values.leadtime);
+    const containerSize = parseContainerSize(values.size);
 
     const order: PlannedOrder = {
       id: `po-import-${rowNumber}-${Date.now()}`,
@@ -147,6 +227,8 @@ export function buildPlannedOrdersFromRows(
       leadTimeDays,
       active: true,
       containerNumber: container,
+      containerSize,
+      notes: cleanCell(values.notes) || undefined,
       importedMombasaEta: cleanCell(values.mombasaEta) || undefined,
       importedStoreDate: cleanCell(values.storeDate) || undefined,
       importedActual: cleanCell(values.actual) || undefined,

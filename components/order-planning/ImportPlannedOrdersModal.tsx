@@ -1,9 +1,11 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Upload, X } from "lucide-react";
+import type { DragEvent } from "react";
+import { FileWarning, Upload, X } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase/client";
 import { buildPlannedOrdersFromRows, normalizeHeader, type ImportRowResult } from "@/lib/order-import";
+import { extractGridFromPdf } from "@/lib/pdf-text";
 import type { PlannedOrder } from "@/types";
 
 /** A minimal CSV line splitter that still handles quoted commas — good
@@ -32,26 +34,41 @@ function parseCsv(text: string): string[][] {
     });
 }
 
-function rowsFromGrid(grid: (string | undefined)[][]): { rowNumber: number; values: Record<string, unknown> }[] {
+/**
+ * Builds row objects two ways at once: `values` (matched by recognized
+ * header, when there is one) and `rawCells` (every cell, unconditionally)
+ * — buildPlannedOrdersFromRows falls back to scanning rawCells for a
+ * container-code- or date-shaped value when a row has no usable header
+ * match, which is what makes an unstructured PDF-extracted grid or an
+ * unexpectedly-labeled spreadsheet still importable.
+ */
+function rowsFromGrid(
+  grid: (string | undefined)[][]
+): { rowNumber: number; values: Record<string, unknown>; rawCells: unknown[] }[] {
   if (grid.length === 0) return [];
   const headerMap = grid[0].map((h) => normalizeHeader(String(h ?? "")));
+  const hasAnyHeaderMatch = headerMap.some((f) => f !== undefined);
 
-  return grid.slice(1).map((row, i) => {
+  // No row looked like a header at all (typical for a PDF table with no
+  // clear label row) — treat every row as data, not just rows after the
+  // first, so nothing real gets mistaken for a header and discarded.
+  const dataRows = hasAnyHeaderMatch ? grid.slice(1) : grid;
+  const rowOffset = hasAnyHeaderMatch ? 2 : 1;
+
+  return dataRows.map((row, i) => {
     const values: Record<string, unknown> = {};
-    headerMap.forEach((field, colIndex) => {
-      if (field) values[field] = row[colIndex];
-    });
-    return { rowNumber: i + 2, values }; // +2: 1-indexed, plus the header row
+    if (hasAnyHeaderMatch) {
+      headerMap.forEach((field, colIndex) => {
+        if (field) values[field] = row[colIndex];
+      });
+    }
+    return { rowNumber: i + rowOffset, values, rawCells: row };
   });
 }
 
 export function ImportPlannedOrdersModal({
-  open,
-  onClose,
   onImport,
 }: {
-  open: boolean;
-  onClose: () => void;
   onImport: (orders: PlannedOrder[]) => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -59,9 +76,8 @@ export function ImportPlannedOrdersModal({
   const [results, setResults] = useState<ImportRowResult[] | null>(null);
   const [parsing, setParsing] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  if (!open) return null;
 
   function reset() {
     setFileName(null);
@@ -77,11 +93,21 @@ export function ImportPlannedOrdersModal({
     setParsing(true);
 
     try {
+      const name = file.name.toLowerCase();
       let grid: (string | undefined)[][];
 
-      if (file.name.toLowerCase().endsWith(".csv")) {
+      if (name.endsWith(".csv")) {
         const text = await file.text();
         grid = parseCsv(text);
+      } else if (name.endsWith(".pdf")) {
+        grid = await extractGridFromPdf(file);
+        if (grid.length === 0) {
+          setError(
+            "Couldn't find any text in that PDF — it may be a scanned image rather than an exported document, which this can't read."
+          );
+          setParsing(false);
+          return;
+        }
       } else {
         const ExcelJS = (await import("exceljs")).default;
         const workbook = new ExcelJS.Workbook();
@@ -102,16 +128,23 @@ export function ImportPlannedOrdersModal({
 
       const rows = rowsFromGrid(grid);
       if (rows.length === 0) {
-        setError("No data rows found — check the file has a header row plus at least one order.");
+        setError("No data found in that file.");
         setParsing(false);
         return;
       }
 
       setResults(buildPlannedOrdersFromRows(rows));
     } catch {
-      setError("Couldn't read that file — make sure it's a valid .xlsx or .csv export.");
+      setError("Couldn't read that file — make sure it's a valid .xlsx, .csv, or .pdf.");
     }
     setParsing(false);
+  }
+
+  function handleDrop(e: DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) handleFile(file);
   }
 
   async function handleConfirmImport() {
@@ -135,6 +168,7 @@ export function ImportPlannedOrdersModal({
             notes: order.notes ?? null,
             active: true,
             container_number: order.containerNumber ?? null,
+            container_size: order.containerSize ?? null,
             imported_mombasa_eta: order.importedMombasaEta ?? null,
             imported_store_date: order.importedStoreDate ?? null,
             imported_actual: order.importedActual ?? null,
@@ -156,102 +190,102 @@ export function ImportPlannedOrdersModal({
     }
 
     reset();
-    onClose();
   }
 
   const errorRows = results?.filter((r) => r.error) ?? [];
   const validCount = results ? results.length - errorRows.length : 0;
 
   return (
-    <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/30 px-4">
-      <div className="w-full max-w-lg rounded-xl border border-border bg-surface p-5 shadow-lg">
-        <div className="flex items-center justify-between">
-          <h2 className="text-[15px] font-semibold text-text-primary">Import order plan</h2>
-          <button
-            onClick={() => {
-              reset();
-              onClose();
-            }}
-            aria-label="Close"
-            className="flex h-7 w-7 items-center justify-center rounded-md text-text-tertiary hover:bg-page"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <p className="mt-1 text-[12.5px] text-text-secondary">
-          An .xlsx or .csv file with columns: Container, Order Date, Order
-          Cycle, Leadtime, Mombasa ETA, Store Date, Actual, Status. Company
-          is detected from the container prefix automatically. One row
-          becomes one order schedule — if your sheet has full history for
-          the same container, you&apos;ll get one schedule per row rather
-          than one merged schedule.
-        </p>
+    <div className="rounded-xl border border-border bg-surface p-5">
+      <h2 className="text-[15px] font-semibold text-text-primary">Upload your order plan</h2>
+      <p className="mt-1 text-[12.5px] text-text-secondary">
+        Drop an .xlsx, .csv, or .pdf file with your order planning details —
+        whatever columns or layout it already has. Company is detected from
+        the container code automatically. A PDF needs to be an exported
+        document, not a scanned image, since a scan has no text to read.
+      </p>
 
-        <div className="mt-4">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".xlsx,.xls,.csv"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) handleFile(file);
-            }}
-            className="hidden"
-            id="order-plan-import-file"
-          />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".xlsx,.xls,.csv,.pdf"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleFile(file);
+        }}
+        className="hidden"
+        id="order-plan-import-file"
+      />
+      <div
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={handleDrop}
+        className={`mt-4 rounded-lg border-2 border-dashed px-4 py-8 text-center transition-colors ${
+          dragging ? "border-accent bg-accent-soft" : "border-border-strong"
+        }`}
+      >
+        <Upload className="mx-auto h-6 w-6 text-text-tertiary" />
+        <p className="mt-2 text-sm text-text-secondary">
+          Drag a file here, or{" "}
           <label
             htmlFor="order-plan-import-file"
-            className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border-strong px-4 py-6 text-sm text-text-secondary hover:bg-page"
+            className="cursor-pointer font-medium text-accent hover:underline"
           >
-            <Upload className="h-4 w-4" />
-            {fileName ?? "Choose a .xlsx or .csv file"}
+            browse to upload
           </label>
-        </div>
-
-        {parsing && <p className="mt-3 text-[13px] text-text-tertiary">Reading file…</p>}
-        {error && <p className="mt-3 text-xs text-danger">{error}</p>}
-
-        {results && !parsing && (
-          <div className="mt-4 space-y-2">
-            <p className="text-[12.5px] text-text-secondary">
-              <span className="font-medium text-success">{validCount} ready to import</span>
-              {errorRows.length > 0 && (
-                <span className="text-danger"> · {errorRows.length} skipped</span>
-              )}
-            </p>
-            {errorRows.length > 0 && (
-              <div className="max-h-32 overflow-y-auto rounded-lg border border-border p-2.5 text-xs text-text-tertiary">
-                {errorRows.map((r) => (
-                  <div key={r.rowNumber}>
-                    Row {r.rowNumber}: {r.error}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        <div className="mt-5 flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              reset();
-              onClose();
-            }}
-            className="rounded-lg border border-border px-3.5 py-2 text-sm font-medium text-text-secondary hover:bg-page"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleConfirmImport}
-            disabled={!results || validCount === 0 || importing}
-            className="rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-50"
-          >
-            {importing ? "Importing…" : `Import ${validCount || ""} order${validCount === 1 ? "" : "s"}`}
-          </button>
-        </div>
+        </p>
+        {fileName && <p className="mt-2 text-xs text-text-tertiary">{fileName}</p>}
       </div>
+
+      {parsing && <p className="mt-3 text-[13px] text-text-tertiary">Reading file…</p>}
+      {error && (
+        <div className="mt-3 flex items-start gap-2 rounded-lg border border-danger/20 bg-danger-soft px-3 py-2.5 text-xs text-danger">
+          <FileWarning className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          {error}
+        </div>
+      )}
+
+      {results && !parsing && (
+        <div className="mt-4 space-y-3">
+          <p className="text-[12.5px] text-text-secondary">
+            <span className="font-medium text-success">{validCount} ready to import</span>
+            {errorRows.length > 0 && (
+              <span className="text-danger"> · {errorRows.length} skipped</span>
+            )}
+          </p>
+          {errorRows.length > 0 && (
+            <div className="max-h-32 overflow-y-auto rounded-lg border border-border p-2.5 text-xs text-text-tertiary">
+              {errorRows.map((r) => (
+                <div key={r.rowNumber}>
+                  Row {r.rowNumber}: {r.error}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleConfirmImport}
+              disabled={validCount === 0 || importing}
+              className="rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-50"
+            >
+              {importing ? "Importing…" : `Import ${validCount || ""} order${validCount === 1 ? "" : "s"}`}
+            </button>
+            <button
+              type="button"
+              onClick={reset}
+              className="flex items-center gap-1 rounded-lg border border-border px-3 py-2 text-sm font-medium text-text-secondary hover:bg-page"
+            >
+              <X className="h-3.5 w-3.5" />
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

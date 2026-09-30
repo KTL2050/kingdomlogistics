@@ -2,9 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { FileSpreadsheet, Plus, Upload } from "lucide-react";
+import { FileSpreadsheet } from "lucide-react";
 import { FilterTabs } from "@/components/ui/FilterButton";
-import { AddPlannedOrderModal } from "@/components/order-planning/AddPlannedOrderModal";
 import { ImportPlannedOrdersModal } from "@/components/order-planning/ImportPlannedOrdersModal";
 import { DueSoonBanner } from "@/components/order-planning/DueSoonBanner";
 import {
@@ -75,8 +74,6 @@ export function OrderPlanningView({
   const [companyTab, setCompanyTab] = useState<(typeof COMPANY_TABS)[number]>("All Companies");
   const [customStart, setCustomStart] = useState(isoMonthStart());
   const [customEnd, setCustomEnd] = useState(isoMonthStart(3));
-  const [modalOpen, setModalOpen] = useState(false);
-  const [importModalOpen, setImportModalOpen] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
 
   // Due-soon reminders ignore the timeframe/company filters below on
@@ -210,6 +207,8 @@ export function OrderPlanningView({
     <div className="space-y-4">
       <DueSoonBanner dueSoon={dueSoon} onPlaced={handlePlaced} />
 
+      {canManage && <ImportPlannedOrdersModal onImport={(orders) => setItems((prev) => [...orders, ...prev])} />}
+
       <div className="rounded-xl border border-border bg-surface">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
           <div className="flex flex-wrap items-center gap-2">
@@ -234,24 +233,6 @@ export function OrderPlanningView({
               <FileSpreadsheet className="h-4 w-4" />
               Export Excel
             </button>
-            {canManage && (
-              <button
-                onClick={() => setImportModalOpen(true)}
-                className="flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3.5 py-2 text-sm font-medium text-text-secondary hover:bg-page"
-              >
-                <Upload className="h-4 w-4" />
-                Import Excel/CSV
-              </button>
-            )}
-            {canManage && (
-              <button
-                onClick={() => setModalOpen(true)}
-                className="flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white hover:bg-accent/90"
-              >
-                <Plus className="h-4 w-4" />
-                Add schedule
-              </button>
-            )}
           </div>
         </div>
 
@@ -315,18 +296,6 @@ export function OrderPlanningView({
           </table>
         </div>
       </div>
-
-      <AddPlannedOrderModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        onAdd={(order) => setItems((prev) => [order, ...prev])}
-      />
-
-      <ImportPlannedOrdersModal
-        open={importModalOpen}
-        onClose={() => setImportModalOpen(false)}
-        onImport={(orders) => setItems((prev) => [...orders, ...prev])}
-      />
     </div>
   );
 }
