@@ -107,7 +107,7 @@ export function Header({
             </button>
 
             {notifOpen && (
-              <div className="absolute right-0 top-[calc(100%+6px)] z-50 w-72 overflow-hidden rounded-lg border border-border bg-surface shadow-lg sm:w-80">
+              <div className="absolute right-0 top-[calc(100%+6px)] z-[1200] w-72 overflow-hidden rounded-lg border border-border bg-surface shadow-lg sm:w-80">
                 <div className="border-b border-border px-3.5 py-2.5 text-[12.5px] font-semibold text-text-primary">
                   Notifications
                 </div>
@@ -169,7 +169,7 @@ export function Header({
             </button>
 
             {menuOpen && (
-              <div className="absolute right-0 top-[calc(100%+6px)] z-50 w-56 overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-lg">
+              <div className="absolute right-0 top-[calc(100%+6px)] z-[1200] w-56 overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-lg">
                 <Link
                   href="/settings"
                   onClick={() => setMenuOpen(false)}
