@@ -26,29 +26,37 @@ export default async function ReportsPage() {
       <ExportButtons shipments={shipments} kpi={kpi} avgDelay={avgDelay} avgTransit={avgTransit} />
 
       <div id="reports-export-area" className="bg-page">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <KpiCard icon={Boxes} label="Total Shipments" value={kpi.total} supporting="All time" tone="accent" />
-          <KpiCard
-            icon={Percent}
-            label="On-Time Rate"
-            value={Math.round((kpi.onTime / kpi.total) * 100)}
-            supporting="Percent of shipments"
-            tone="success"
-          />
-          <KpiCard
-            icon={Clock}
-            label="Avg. Delay"
-            value={Number(avgDelay.toFixed(1))}
-            supporting="Days, delayed shipments only"
-            tone="danger"
-          />
-          <KpiCard
-            icon={Timer}
-            label="Avg. Transit Time"
-            value={Math.round(avgTransit)}
-            supporting="Days, ETD to final ETA"
-            tone="warning"
-          />
+        <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-1 sm:grid sm:grid-cols-2 sm:overflow-visible sm:pb-0 xl:grid-cols-4">
+          <div className="min-w-0 shrink-0 basis-[calc(50%-8px)] snap-start sm:basis-auto">
+            <KpiCard icon={Boxes} label="Total Shipments" value={kpi.total} supporting="All time" tone="accent" />
+          </div>
+          <div className="min-w-0 shrink-0 basis-[calc(50%-8px)] snap-start sm:basis-auto">
+            <KpiCard
+              icon={Percent}
+              label="On-Time Rate"
+              value={Math.round((kpi.onTime / kpi.total) * 100)}
+              supporting="Percent of shipments"
+              tone="success"
+            />
+          </div>
+          <div className="min-w-0 shrink-0 basis-[calc(50%-8px)] snap-start sm:basis-auto">
+            <KpiCard
+              icon={Clock}
+              label="Avg. Delay"
+              value={Number(avgDelay.toFixed(1))}
+              supporting="Days, delayed shipments only"
+              tone="danger"
+            />
+          </div>
+          <div className="min-w-0 shrink-0 basis-[calc(50%-8px)] snap-start sm:basis-auto">
+            <KpiCard
+              icon={Timer}
+              label="Avg. Transit Time"
+              value={Math.round(avgTransit)}
+              supporting="Days, ETD to final ETA"
+              tone="warning"
+            />
+          </div>
         </div>
 
         <div className="mt-4">
