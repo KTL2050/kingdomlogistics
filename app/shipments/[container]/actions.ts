@@ -126,13 +126,32 @@ async function syncShipmentTracking({
       ? buildDelayReason(newDelay.name, newDelay.plannedDateIso, newDelay.actualDateIso, newDelay.daysLate)
       : undefined;
 
+    // Stored on the specific milestone (not just the shared shipment-level
+    // field below) so a later delay at a different stage can't silently
+    // overwrite this one's reason.
+    const milestonesWithReason =
+      newDelay && delayReason
+        ? milestones.map((m) =>
+            m.name === newDelay.name
+              ? {
+                  ...m,
+                  delayReason,
+                  delayReportedAt: new Date().toLocaleDateString("en-GB", {
+                    day: "2-digit",
+                    month: "short",
+                  }),
+                }
+              : m
+          )
+        : milestones;
+
     const { error } = await supabase
       .from("shipments")
       .update({
         tracking_reference: reference,
         tracking_reference_type: referenceType,
         shipping_line: result.data.sealine_name || undefined,
-        milestones,
+        milestones: milestonesWithReason,
         waypoints,
         current_status: currentStatus,
         current_location: currentLocation || undefined,

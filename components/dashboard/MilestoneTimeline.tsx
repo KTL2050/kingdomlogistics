@@ -1,8 +1,12 @@
+"use client";
+
+import { useState } from "react";
 import {
   AlertTriangle,
   Anchor,
   ClipboardList,
   Home,
+  MessageSquarePlus,
   Package,
   Ship,
   Truck,
@@ -10,10 +14,24 @@ import {
 import type { Shipment } from "@/types";
 import { cn, milestoneStyles } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { MilestoneReasonModal } from "@/components/dashboard/MilestoneReasonModal";
 
 const STEP_ICONS = [ClipboardList, Package, Ship, Anchor, Truck, Home, Home];
 
-export function MilestoneTimeline({ shipment }: { shipment: Shipment }) {
+export function MilestoneTimeline({
+  shipment,
+  canEditReasons = false,
+  currentUserName,
+}: {
+  shipment: Shipment;
+  /** Only Logistics Manager, same as sending inland progress updates —
+   * adding a reason retroactively is the same kind of action. */
+  canEditReasons?: boolean;
+  currentUserName?: string;
+}) {
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const editingMilestone = shipment.milestones.find((m) => m.id === editingId);
+
   return (
     <div className="rounded-xl border border-border bg-surface p-4">
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-3">
@@ -146,23 +164,55 @@ export function MilestoneTimeline({ shipment }: { shipment: Shipment }) {
                   </div>
                 </div>
               </div>
+
+              {canEditReasons && m.actualDate && (
+                <button
+                  type="button"
+                  onClick={() => setEditingId(m.id)}
+                  className="mt-1.5 flex items-center gap-1 text-[10px] font-medium text-text-tertiary hover:text-accent"
+                >
+                  <MessageSquarePlus className="h-3 w-3" />
+                  {m.delayReason ? "Edit reason" : "Add reason"}
+                </button>
+              )}
             </div>
           );
         })}
       </div>
 
-      {shipment.delayReason && (
-        <div className="mt-3 flex items-start gap-2.5 rounded-lg border border-danger/20 bg-danger-soft px-3.5 py-2.5">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-danger" />
-          <div className="flex-1 text-[12px]">
-            <span className="font-medium text-danger">{shipment.delayReason}</span>
-          </div>
-          {shipment.delayReportedAt && (
-            <div className="shrink-0 text-[11px] text-text-tertiary">
-              Reported: {shipment.delayReportedAt}
+      {/* Each stage's own reason, so an earlier one (e.g. Mombasa Port)
+          stays visible even after a later stage also goes delayed —
+          unlike a single shared field, which only ever shows the most
+          recent. */}
+      {shipment.milestones
+        .filter((m) => m.delayReason)
+        .map((m) => (
+          <div
+            key={m.id}
+            className="mt-3 flex items-start gap-2.5 rounded-lg border border-danger/20 bg-danger-soft px-3.5 py-2.5"
+          >
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-danger" />
+            <div className="flex-1 text-[12px]">
+              <span className="font-medium text-text-primary">{m.name}:</span>{" "}
+              <span className="text-danger">{m.delayReason}</span>
             </div>
-          )}
-        </div>
+            {m.delayReportedAt && (
+              <div className="shrink-0 text-[11px] text-text-tertiary">
+                Reported: {m.delayReportedAt}
+              </div>
+            )}
+          </div>
+        ))}
+
+      {editingMilestone && (
+        <MilestoneReasonModal
+          shipmentId={shipment.id}
+          containerNumber={shipment.containerNumber}
+          milestones={shipment.milestones}
+          milestone={editingMilestone}
+          currentUserName={currentUserName}
+          onClose={() => setEditingId(null)}
+        />
       )}
     </div>
   );

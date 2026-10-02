@@ -44,6 +44,11 @@ export interface Milestone {
   actualDate: string | null;
   durationLabel: string;
   plannedDateIso?: string;
+  /** This stage's own delay explanation — kept per-milestone (not a
+   * single shared field on Shipment) so a later delay at a different
+   * stage can't silently overwrite an earlier one's reason. */
+  delayReason?: string;
+  delayReportedAt?: string;
 }
 
 export interface Waypoint {

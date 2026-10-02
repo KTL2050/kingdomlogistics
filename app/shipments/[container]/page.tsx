@@ -98,7 +98,11 @@ export default async function ShipmentDetailPage({
         </div>
       )}
 
-      <MilestoneTimeline shipment={shipment} />
+      <MilestoneTimeline
+        shipment={shipment}
+        canEditReasons={canSendUpdate}
+        currentUserName={user.fullName}
+      />
     </AppShell>
   );
 }

@@ -130,12 +130,24 @@ export function ManualProgressForm({
     const delayResult = checkDelay(plannedIso, actualIso);
     const wasAlreadyDelayed = milestones[targetIndex].status === "delayed";
 
+    const isNewDelay = delayResult.isDelayed && !wasAlreadyDelayed;
+    const delayReason =
+      isNewDelay && plannedIso
+        ? buildDelayReason(stageName, plannedIso, actualIso, delayResult.daysLate)
+        : undefined;
+
     const updated = milestones.map((m, i) => {
       if (i === targetIndex) {
         return {
           ...m,
           status: delayResult.isDelayed ? ("delayed" as const) : ("completed" as const),
           actualDate: shortDate(date),
+          // Stored on this specific milestone (not a shared shipment-level
+          // field) so a later delay at a different stage can't silently
+          // overwrite this one's reason.
+          ...(isNewDelay && delayReason
+            ? { delayReason, delayReportedAt: shortDate(new Date().toISOString()) }
+            : {}),
         };
       }
       // Anything skipped over between the last confirmed stage and this
@@ -150,12 +162,6 @@ export function ManualProgressForm({
       }
       return m;
     });
-
-    const isNewDelay = delayResult.isDelayed && !wasAlreadyDelayed;
-    const delayReason =
-      isNewDelay && plannedIso
-        ? buildDelayReason(stageName, plannedIso, actualIso, delayResult.daysLate)
-        : undefined;
 
     const { error: updateError } = await supabase
       .from("shipments")
