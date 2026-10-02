@@ -84,13 +84,17 @@ export function AlertDetailModal({ alert, onClose }: { alert: Alert; onClose: ()
         <p className="mt-3 text-[11px] text-text-tertiary">{alert.timestamp}</p>
 
         <div className="mt-4 flex items-center justify-between gap-2">
-          <Link
-            href={`/shipments/${alert.shipmentNumber}`}
-            onClick={onClose}
-            className="text-[12.5px] font-medium text-accent hover:underline"
-          >
-            View shipment {alert.shipmentNumber} →
-          </Link>
+          {alert.shipmentNumber ? (
+            <Link
+              href={`/shipments/${alert.shipmentNumber}`}
+              onClick={onClose}
+              className="text-[12.5px] font-medium text-accent hover:underline"
+            >
+              View shipment {alert.shipmentNumber} →
+            </Link>
+          ) : (
+            <span />
+          )}
           <button
             onClick={onClose}
             className="rounded-lg border border-border px-3 py-1.5 text-[12.5px] font-medium text-text-secondary hover:bg-page"

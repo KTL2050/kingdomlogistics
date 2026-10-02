@@ -80,26 +80,36 @@ export function AuthCard() {
       return;
     }
     setLoading(true);
+    // Email confirmation is intentionally off at the Supabase project
+    // level (see Authentication settings) — approval happens entirely
+    // through the admin-review gate below instead, since Supabase's
+    // built-in email sender has a very low rate limit that real
+    // registrations were hitting. With confirmation off, this returns an
+    // active session immediately, same as signing in.
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        data: { full_name: fullName },
-        // Without this, Supabase builds the confirmation link from the
-        // project's dashboard "Site URL" setting instead — which is what
-        // sent real users to localhost:3000 and broke every signup until
-        // that setting was fixed. This makes it resolve from wherever the
-        // app is actually running, matching handleForgotPassword below.
-        emailRedirectTo: typeof window !== "undefined" ? `${window.location.origin}/login` : undefined,
-      },
+      options: { data: { full_name: fullName } },
     });
-    setLoading(false);
     if (error) {
+      setLoading(false);
       setError(error.message);
       return;
     }
-    setNotice("Account created — check your email to confirm it, then sign in.");
-    setMode("login");
+
+    // Lets an admin act on this without having to go check the Team
+    // panel on the off chance someone signed up — same "everyone gets
+    // notified" pattern as the rest of the app's alerts.
+    await supabase.from("alerts").insert({
+      severity: "info",
+      title: "New user awaiting approval",
+      description: `${fullName} (${email}) has signed up and needs approval before they can access the system.`,
+      acknowledged: false,
+    });
+
+    setLoading(false);
+    router.push("/");
+    router.refresh();
   }
 
   async function handleForgotPassword(e: React.FormEvent) {
