@@ -191,7 +191,10 @@ export function ManualProgressForm({
     await supabase.from("alerts").insert({
       severity: isNewDelay ? "warning" : "info",
       shipment_number: containerNumber,
-      title: isNewDelay ? `Delay at ${stageName}` : `Update: ${containerNumber} — ${stageName}`,
+      // Plain stage name, not "Delay at X" — the warning/info icon and
+      // severity color already signal whether it's a delay; description
+      // and manager_note carry the actual detail.
+      title: stageName,
       description: isNewDelay && delayReason ? delayReason : `Now at: ${location.trim()}.`,
       acknowledged: false,
       manager_note: reason.trim(),

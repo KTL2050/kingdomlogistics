@@ -76,7 +76,7 @@ export function AlertDetailModal({ alert, onClose }: { alert: Alert; onClose: ()
         {alert.expectedNextStage && alert.expectedNextDate && (
           <div className="mt-3 flex items-center gap-1.5 text-[12.5px] text-text-secondary">
             <Calendar className="h-3.5 w-3.5 shrink-0 text-text-tertiary" />
-            Expected at {alert.expectedNextStage}:{" "}
+            Expected to reach {alert.expectedNextStage} by{" "}
             <span className="font-medium text-text-primary">{alert.expectedNextDate}</span>
           </div>
         )}

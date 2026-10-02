@@ -94,7 +94,7 @@ export function AlertCard({
         {alert.expectedNextStage && alert.expectedNextDate && !editingNote && (
           <div className="mt-2 flex items-center gap-1.5 text-[11px] text-text-secondary">
             <Calendar className="h-3 w-3 shrink-0 text-text-tertiary" />
-            Expected at {alert.expectedNextStage}:{" "}
+            Expected to reach {alert.expectedNextStage} by{" "}
             <span className="font-medium text-text-primary">{alert.expectedNextDate}</span>
           </div>
         )}
