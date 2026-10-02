@@ -10,7 +10,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { CompanyBadge } from "@/components/ui/CompanyBadge";
 import { getShipmentByContainer, getCurrentUser } from "@/lib/data";
 import { getRouteStepsForContainer } from "@/lib/mock-data";
-import { canManageStageDurations } from "@/lib/utils";
+import { canManageStageDurations, canSendInlandUpdates } from "@/lib/utils";
 
 export default async function ShipmentDetailPage({
   params,
@@ -23,7 +23,11 @@ export default async function ShipmentDetailPage({
   if (!shipment) notFound();
   if (!user) redirect("/login");
 
-  const canUpdateInlandProgress = user.status === "approved" && canManageStageDurations(user.role);
+  // Sending inland progress updates is restricted to Logistics Manager
+  // specifically — narrower than who may set stage-duration overrides
+  // on this container, which stays open to Admin/Operations Officer too.
+  const canSendUpdate = user.status === "approved" && canSendInlandUpdates(user.role);
+  const canManageContainer = user.status === "approved" && canManageStageDurations(user.role);
 
   return (
     <AppShell
@@ -70,7 +74,7 @@ export default async function ShipmentDetailPage({
         />
       </div>
 
-      {canUpdateInlandProgress && (
+      {canSendUpdate && (
         <div className="mb-4">
           <ManualProgressForm
             shipmentId={shipment.id}
@@ -82,7 +86,7 @@ export default async function ShipmentDetailPage({
         </div>
       )}
 
-      {canUpdateInlandProgress && (
+      {canManageContainer && (
         <div className="mb-4">
           <ContainerStageDurationsPanel
             shipmentId={shipment.id}

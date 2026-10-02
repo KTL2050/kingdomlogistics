@@ -1,12 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle, AlertTriangle, Calendar, Check, Info, MessageSquarePlus } from "lucide-react";
 import type { Alert } from "@/types";
 import { cn, severityStyles } from "@/lib/utils";
 import { supabase } from "@/lib/supabase/client";
+import { AlertDetailModal } from "@/components/dashboard/AlertDetailModal";
 
 const SEVERITY_ICON = {
   critical: AlertCircle,
@@ -26,6 +26,7 @@ export function AlertCard({
   currentUserName?: string;
 }) {
   const router = useRouter();
+  const [detailOpen, setDetailOpen] = useState(false);
   const [acknowledging, setAcknowledging] = useState(false);
   const [editingNote, setEditingNote] = useState(false);
   const [noteDraft, setNoteDraft] = useState(alert.managerNote ?? "");
@@ -68,10 +69,14 @@ export function AlertCard({
         <Icon className={cn("h-3.5 w-3.5", style.text)} />
       </div>
       <div className="min-w-0 flex-1">
-        <Link href={`/shipments/${alert.shipmentNumber}`} className="block hover:opacity-80">
+        <button
+          type="button"
+          onClick={() => setDetailOpen(true)}
+          className="block w-full text-left hover:opacity-80"
+        >
           <div className="text-[12.5px] font-medium text-text-primary">{alert.title}</div>
           <div className="mt-0.5 text-xs text-text-secondary">{alert.description}</div>
-        </Link>
+        </button>
 
         {alert.managerNote && !editingNote && (
           <div className="mt-2 rounded-md border border-info/20 bg-info-soft px-2.5 py-2">
@@ -148,6 +153,8 @@ export function AlertCard({
           </div>
         </div>
       </div>
+
+      {detailOpen && <AlertDetailModal alert={alert} onClose={() => setDetailOpen(false)} />}
     </div>
   );
 }

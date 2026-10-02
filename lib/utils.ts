@@ -134,3 +134,10 @@ export const STAGE_DURATION_MANAGER_ROLES = [
 export function canManageStageDurations(role: string): boolean {
   return (STAGE_DURATION_MANAGER_ROLES as readonly string[]).includes(role);
 }
+
+// Sending an inland progress update (ManualProgressForm) is deliberately
+// narrower than the general manager-ish role set above — only Logistics
+// Manager, not Admin or Operations Officer, by explicit request.
+export function canSendInlandUpdates(role: string): boolean {
+  return role === "Logistics Manager";
+}
