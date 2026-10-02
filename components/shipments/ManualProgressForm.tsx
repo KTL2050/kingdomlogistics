@@ -194,7 +194,7 @@ export function ManualProgressForm({
     // manager_note (the same structured, attributed field AlertCard
     // already renders as its own labeled box), instead of both being
     // mashed into one run-on sentence.
-    await supabase.from("alerts").insert({
+    const { error: alertError } = await supabase.from("alerts").insert({
       severity: isNewDelay ? "warning" : "info",
       shipment_number: containerNumber,
       // Plain stage name, not "Delay at X" — the warning/info icon and
@@ -211,6 +211,21 @@ export function ManualProgressForm({
         expected_next_date: expectedNextDate,
       }),
     });
+
+    // The shipment itself already saved successfully at this point — if
+    // only the notification failed (most likely an RLS policy denial),
+    // that must still surface, or the manager sees a false "everyone
+    // notified" success while nobody actually got told.
+    if (alertError) {
+      setSaving(false);
+      setError(`Update saved, but the team notification failed: ${alertError.message}`);
+      setLocation("");
+      setOverrideIndex(null);
+      setReason("");
+      setExpectedNextDate("");
+      router.refresh();
+      return;
+    }
 
     setSaving(false);
     setSuccess(true);

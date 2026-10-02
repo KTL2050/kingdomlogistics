@@ -316,6 +316,15 @@ create policy "Managers and officers can create alerts"
     )
   );
 
+-- A brand-new signup is "Viewer"/"pending" by default, not a manager
+-- role — without this, the "New user awaiting approval" alert created
+-- right after signup (AuthCard.tsx) would be silently rejected by the
+-- policy above every single time. Scoped to admin_only rows only, so it
+-- can't be used to create a normal, everyone-visible alert.
+drop policy if exists "Any authenticated user can create admin_only alerts" on alerts;
+create policy "Any authenticated user can create admin_only alerts"
+  on alerts for insert to authenticated with check (admin_only = true);
+
 -- Any authenticated user can acknowledge an alert (matches AlertCard's
 -- existing behavior, which has no role check) — the manager-note fields
 -- on this same row are restricted to managers at the UI level instead,

@@ -174,15 +174,21 @@ async function syncShipmentTracking({
     if (error) return { error: error.message };
 
     // A newly-detected delay also raises an alert — this is what feeds
-    // the Alerts page and the notification bell.
+    // the Alerts page and the notification bell. The tracking sync
+    // itself already succeeded at this point, so a failed notification
+    // here shouldn't fail the whole sync — but it must still be logged,
+    // not silently dropped, or a real failure looks identical to success.
     if (newDelay && delayReason) {
-      await supabase.from("alerts").insert({
+      const { error: alertError } = await supabase.from("alerts").insert({
         severity: "warning",
         shipment_number: containerNumber,
         title: `Delay at ${newDelay.name}`,
         description: delayReason,
         acknowledged: false,
       });
+      if (alertError) {
+        console.error("Failed to create delay alert after tracking sync:", alertError.message);
+      }
     }
 
     return { success: true };

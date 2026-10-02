@@ -65,7 +65,7 @@ export function MilestoneReasonModal({
 
     // Same "everyone gets notified" promise as sending a regular inland
     // progress update — a retroactive reason is still news to the team.
-    await supabase.from("alerts").insert({
+    const { error: alertError } = await supabase.from("alerts").insert({
       severity: "warning",
       shipment_number: containerNumber,
       title: milestone.name,
@@ -77,6 +77,14 @@ export function MilestoneReasonModal({
     });
 
     setSaving(false);
+    // The reason itself already saved successfully — if only the
+    // notification failed, that must still surface rather than silently
+    // closing as if everyone was told.
+    if (alertError) {
+      setError(`Reason saved, but the team notification failed: ${alertError.message}`);
+      router.refresh();
+      return;
+    }
     router.refresh();
     onClose();
   }
