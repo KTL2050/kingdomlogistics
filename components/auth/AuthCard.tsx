@@ -105,6 +105,9 @@ export function AuthCard() {
       title: "New user awaiting approval",
       description: `${fullName} (${email}) has signed up and needs approval before they can access the system.`,
       acknowledged: false,
+      // Enforced by the alerts SELECT policy itself (admin_only), not
+      // just hidden in the UI — no other role can act on this anyway.
+      admin_only: true,
     });
 
     setLoading(false);

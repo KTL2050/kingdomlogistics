@@ -138,6 +138,10 @@ create table if not exists alerts (
   -- baseline on the milestone timeline.
   expected_next_stage text,
   expected_next_date date,
+  -- Restricts this row to Admins only at the database level (see the
+  -- SELECT policy below) — e.g. "new user awaiting approval" alerts,
+  -- which no other role can act on anyway.
+  admin_only boolean not null default false,
   created_at timestamptz not null default now()
 );
 
@@ -145,6 +149,7 @@ create table if not exists alerts (
 alter table alerts add column if not exists shipment_number text;
 alter table alerts add column if not exists manager_note text;
 alter table alerts add column if not exists manager_note_by text;
+alter table alerts add column if not exists admin_only boolean not null default false;
 alter table alerts add column if not exists manager_note_at timestamptz;
 alter table alerts add column if not exists expected_next_stage text;
 alter table alerts add column if not exists expected_next_date date;
@@ -284,8 +289,19 @@ create policy "Authenticated users can read container_locations"
 create policy "Authenticated users can read milestones"
   on shipment_milestones for select to authenticated using (true);
 
+-- Dropped and recreated (not just added fresh) because this project's
+-- database already had the old "using (true)" version from before
+-- admin_only existed — see the alter table above.
+drop policy if exists "Authenticated users can read alerts" on alerts;
 create policy "Authenticated users can read alerts"
-  on alerts for select to authenticated using (true);
+  on alerts for select to authenticated using (
+    admin_only = false
+    or exists (
+      select 1 from users
+      where users.id = auth.uid()
+      and users.role = 'Admin'
+    )
+  );
 
 -- alerts previously had no write policies at all, which — since RLS
 -- defaults to deny — meant the insert calls in actions.ts /
