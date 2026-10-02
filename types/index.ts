@@ -98,6 +98,11 @@ export interface Alert {
   managerNote?: string;
   managerNoteBy?: string;
   managerNoteAt?: string;
+  /** The manager's own forecast for when the container will reach the
+   * stage after this update — a prediction, distinct from the fixed
+   * "Planned" baseline shown on the milestone timeline. */
+  expectedNextStage?: string;
+  expectedNextDate?: string;
 }
 
 export interface KpiSummary {

@@ -133,6 +133,11 @@ create table if not exists alerts (
   manager_note text,
   manager_note_by text,
   manager_note_at timestamptz,
+  -- The manager's own forecast for when the container will reach the
+  -- stage after this update — a prediction, not the fixed "Planned"
+  -- baseline on the milestone timeline.
+  expected_next_stage text,
+  expected_next_date date,
   created_at timestamptz not null default now()
 );
 
@@ -141,6 +146,8 @@ alter table alerts add column if not exists shipment_number text;
 alter table alerts add column if not exists manager_note text;
 alter table alerts add column if not exists manager_note_by text;
 alter table alerts add column if not exists manager_note_at timestamptz;
+alter table alerts add column if not exists expected_next_stage text;
+alter table alerts add column if not exists expected_next_date date;
 
 create index if not exists idx_alerts_shipment_id on alerts (shipment_id);
 

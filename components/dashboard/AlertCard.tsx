@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, AlertTriangle, Check, Info, MessageSquarePlus } from "lucide-react";
+import { AlertCircle, AlertTriangle, Calendar, Check, Info, MessageSquarePlus } from "lucide-react";
 import type { Alert } from "@/types";
 import { cn, severityStyles } from "@/lib/utils";
 import { supabase } from "@/lib/supabase/client";
@@ -75,11 +75,22 @@ export function AlertCard({
 
         {alert.managerNote && !editingNote && (
           <div className="mt-2 rounded-md border border-info/20 bg-info-soft px-2.5 py-2">
-            <p className="text-[11.5px] text-text-primary">{alert.managerNote}</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-info">
+              Manager&apos;s note
+            </p>
+            <p className="mt-0.5 text-[11.5px] text-text-primary">{alert.managerNote}</p>
             <p className="mt-1 text-[10.5px] text-text-tertiary">
               — {alert.managerNoteBy ?? "Unknown"}
               {alert.managerNoteAt ? `, ${alert.managerNoteAt}` : ""}
             </p>
+          </div>
+        )}
+
+        {alert.expectedNextStage && alert.expectedNextDate && !editingNote && (
+          <div className="mt-2 flex items-center gap-1.5 text-[11px] text-text-secondary">
+            <Calendar className="h-3 w-3 shrink-0 text-text-tertiary" />
+            Expected at {alert.expectedNextStage}:{" "}
+            <span className="font-medium text-text-primary">{alert.expectedNextDate}</span>
           </div>
         )}
 

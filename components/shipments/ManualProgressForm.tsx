@@ -23,11 +23,13 @@ export function ManualProgressForm({
   containerNumber,
   steps,
   milestones,
+  currentUserName,
 }: {
   shipmentId: string;
   containerNumber: string;
   steps: readonly string[];
   milestones: Milestone[];
+  currentUserName?: string;
 }) {
   const router = useRouter();
   const mombasaIndex = steps.indexOf("Mombasa Port");
@@ -52,6 +54,7 @@ export function ManualProgressForm({
   const [overrideIndex, setOverrideIndex] = useState<number | null>(null);
   const [date, setDate] = useState(todayIso());
   const [reason, setReason] = useState("");
+  const [expectedNextDate, setExpectedNextDate] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -175,15 +178,29 @@ export function ManualProgressForm({
       return;
     }
 
+    const nextStageName = steps[targetIndex + 1];
+    const hasExpectedNext = Boolean(nextStageName && expectedNextDate);
+
     // Every update notifies every role, not only ones that happen to be
     // a newly-detected delay — a routine location update still needs the
-    // rest of the team to see it.
+    // rest of the team to see it. `description` stays a clean, short,
+    // auto-generated line; the manager's own explanation goes in
+    // manager_note (the same structured, attributed field AlertCard
+    // already renders as its own labeled box), instead of both being
+    // mashed into one run-on sentence.
     await supabase.from("alerts").insert({
       severity: isNewDelay ? "warning" : "info",
       shipment_number: containerNumber,
       title: isNewDelay ? `Delay at ${stageName}` : `Update: ${containerNumber} — ${stageName}`,
-      description: isNewDelay && delayReason ? `${delayReason} — ${reason.trim()}` : `${location.trim()} — ${reason.trim()}`,
+      description: isNewDelay && delayReason ? delayReason : `Now at: ${location.trim()}.`,
       acknowledged: false,
+      manager_note: reason.trim(),
+      manager_note_by: currentUserName ?? null,
+      manager_note_at: new Date().toISOString(),
+      ...(hasExpectedNext && {
+        expected_next_stage: nextStageName,
+        expected_next_date: expectedNextDate,
+      }),
     });
 
     setSaving(false);
@@ -191,6 +208,7 @@ export function ManualProgressForm({
     setLocation("");
     setOverrideIndex(null);
     setReason("");
+    setExpectedNextDate("");
     router.refresh();
   }
 
@@ -255,6 +273,20 @@ export function ManualProgressForm({
             className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-[13px] focus:border-accent focus:outline-none"
           />
         </div>
+
+        {steps[targetIndex + 1] && (
+          <div>
+            <label className="text-[11px] text-text-tertiary">
+              Expected to reach &quot;{steps[targetIndex + 1]}&quot; by (optional)
+            </label>
+            <input
+              type="date"
+              value={expectedNextDate}
+              onChange={(e) => setExpectedNextDate(e.target.value)}
+              className="mt-1 rounded-lg border border-border px-3 py-2 text-[13px] focus:border-accent focus:outline-none"
+            />
+          </div>
+        )}
 
         <button
           type="submit"

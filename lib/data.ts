@@ -77,6 +77,14 @@ function mapAlertRow(row: Record<string, unknown>): Alert {
           minute: "2-digit",
         })
       : undefined,
+    expectedNextStage: (row.expected_next_stage as string | null) ?? undefined,
+    expectedNextDate: row.expected_next_date
+      ? new Date(row.expected_next_date as string).toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        })
+      : undefined,
   };
 }
 

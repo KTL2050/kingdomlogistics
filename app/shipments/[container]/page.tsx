@@ -77,6 +77,7 @@ export default async function ShipmentDetailPage({
             containerNumber={shipment.containerNumber}
             steps={getRouteStepsForContainer(shipment.containerNumber)}
             milestones={shipment.milestones}
+            currentUserName={user.fullName}
           />
         </div>
       )}
