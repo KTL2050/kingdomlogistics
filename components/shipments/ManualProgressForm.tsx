@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Truck } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { checkDelay, buildDelayReason } from "@/lib/delay";
+import { detectStageIndex } from "@/lib/location-detect";
 import type { Milestone } from "@/types";
 
 function shortDate(iso: string) {
@@ -37,14 +38,35 @@ export function ManualProgressForm({
   // "hasn't arrived yet" from "arrived, on time or not".
   const mombasaReached = Boolean(mombasaMilestone?.actualDate);
 
-  // The next stage still needing a manual update — the first one after
-  // Mombasa Port that isn't already marked completed.
+  // The next stage still needing an update — the first one after Mombasa
+  // Port that isn't already marked completed. This is also the floor for
+  // what a manager can select: you can report being further ahead (the
+  // container clearly passed through here already), never further back.
   const nextIndex = milestones.findIndex((m, i) => i > mombasaIndex && m.status !== "completed");
 
+  const [location, setLocation] = useState("");
+  // null = no manual pick yet, so the detected guess (if any) applies.
+  // Cleared whenever the location text changes, so retyping a fresh
+  // description lets detection take over again instead of being stuck
+  // on a stale manual choice.
+  const [overrideIndex, setOverrideIndex] = useState<number | null>(null);
   const [date, setDate] = useState(todayIso());
+  const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  const detectedIndex = nextIndex === -1 ? null : detectStageIndex(location, steps, nextIndex);
+  // Clamped to nextIndex so a stale manual pick can never point at a
+  // stage that a previous submission (and the resulting refresh) has
+  // already completed.
+  const targetIndex = Math.max(overrideIndex ?? detectedIndex ?? nextIndex, nextIndex);
+  const autoDetected = overrideIndex === null && detectedIndex !== null;
+
+  function handleLocationChange(value: string) {
+    setLocation(value);
+    setOverrideIndex(null);
+  }
 
   // Ocean leg isn't confirmed at Mombasa yet — nothing to mark manually
   // until Traqo (or a manual sync) confirms that first.
@@ -77,12 +99,21 @@ export function ManualProgressForm({
     );
   }
 
-  const stageName = steps[nextIndex];
-  const isFinalStage = nextIndex === steps.length - 1;
+  const stageName = steps[targetIndex];
+  const isFinalStage = targetIndex === steps.length - 1;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!supabase) return;
+    if (!location.trim()) {
+      setError("Enter the container's current location.");
+      return;
+    }
+    if (!reason.trim()) {
+      setError("Enter a reason or note for this update.");
+      return;
+    }
+
     setSaving(true);
     setError(null);
     setSuccess(false);
@@ -92,19 +123,26 @@ export function ManualProgressForm({
     // does, so a late manual update gets flagged exactly like a late
     // carrier-confirmed one would.
     const actualIso = new Date(date).toISOString();
-    const plannedIso = milestones[nextIndex].plannedDateIso;
+    const plannedIso = milestones[targetIndex].plannedDateIso;
     const delayResult = checkDelay(plannedIso, actualIso);
-    const wasAlreadyDelayed = milestones[nextIndex].status === "delayed";
+    const wasAlreadyDelayed = milestones[targetIndex].status === "delayed";
 
     const updated = milestones.map((m, i) => {
-      if (i === nextIndex) {
+      if (i === targetIndex) {
         return {
           ...m,
           status: delayResult.isDelayed ? ("delayed" as const) : ("completed" as const),
           actualDate: shortDate(date),
         };
       }
-      if (i === nextIndex + 1 && m.status === "pending") {
+      // Anything skipped over between the last confirmed stage and this
+      // one must have happened too — the container can't be at the store
+      // without having passed through ICD — so it's backfilled as
+      // completed rather than left stuck showing "Not reached" forever.
+      if (i > nextIndex - 1 && i < targetIndex && m.status !== "completed") {
+        return { ...m, status: "completed" as const, actualDate: m.actualDate ?? shortDate(date) };
+      }
+      if (i === targetIndex + 1 && m.status === "pending") {
         return { ...m, status: "current" as const };
       }
       return m;
@@ -121,7 +159,7 @@ export function ManualProgressForm({
       .update({
         milestones: updated,
         current_status: stageName,
-        current_location: stageName,
+        current_location: location.trim(),
         health: delayResult.isDelayed ? "delayed" : isFinalStage ? "completed" : undefined,
         ...(isNewDelay && {
           delay_days: delayResult.daysLate,
@@ -137,18 +175,22 @@ export function ManualProgressForm({
       return;
     }
 
-    if (isNewDelay && delayReason) {
-      await supabase.from("alerts").insert({
-        severity: "warning",
-        shipment_number: containerNumber,
-        title: `Delay at ${stageName}`,
-        description: delayReason,
-        acknowledged: false,
-      });
-    }
+    // Every update notifies every role, not only ones that happen to be
+    // a newly-detected delay — a routine location update still needs the
+    // rest of the team to see it.
+    await supabase.from("alerts").insert({
+      severity: isNewDelay ? "warning" : "info",
+      shipment_number: containerNumber,
+      title: isNewDelay ? `Delay at ${stageName}` : `Update: ${containerNumber} — ${stageName}`,
+      description: isNewDelay && delayReason ? `${delayReason} — ${reason.trim()}` : `${location.trim()} — ${reason.trim()}`,
+      acknowledged: false,
+    });
 
     setSaving(false);
     setSuccess(true);
+    setLocation("");
+    setOverrideIndex(null);
+    setReason("");
     router.refresh();
   }
 
@@ -159,37 +201,72 @@ export function ManualProgressForm({
         <h2 className="text-[14px] font-semibold text-text-primary">Inland progress</h2>
       </div>
       <p className="mt-1 text-[12px] text-text-secondary">
-        Carrier tracking stops at Mombasa Port — mark each remaining stage
-        yourself as the container actually reaches it.
+        Carrier tracking stops at Mombasa Port — tell us where the container
+        actually is. Everyone on the team is notified when you send it.
       </p>
 
-      <form onSubmit={handleSubmit} className="mt-3 flex flex-wrap items-end gap-2">
-        <div className="min-w-[160px] flex-1">
-          <label className="text-[11px] text-text-tertiary">Next stage</label>
-          <div className="mt-1 rounded-lg border border-border bg-page px-3 py-2 text-[13px] font-medium text-text-primary">
-            {stageName}
-          </div>
-        </div>
+      <form onSubmit={handleSubmit} className="mt-3 space-y-3">
         <div>
-          <label className="text-[11px] text-text-tertiary">Date reached</label>
+          <label className="text-[11px] text-text-tertiary">Current location</label>
           <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="mt-1 rounded-lg border border-border px-3 py-2 text-[13px] focus:border-accent focus:outline-none"
+            type="text"
+            value={location}
+            onChange={(e) => handleLocationChange(e.target.value)}
+            placeholder="e.g. On its way to ICD, or Arrived at the store in Ntinda"
+            className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-[13px] focus:border-accent focus:outline-none"
           />
         </div>
+
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="min-w-[160px] flex-1">
+            <label className="text-[11px] text-text-tertiary">
+              Stage {autoDetected && location.trim() && "(detected — change if wrong)"}
+            </label>
+            <select
+              value={targetIndex}
+              onChange={(e) => setOverrideIndex(Number(e.target.value))}
+              className="mt-1 w-full rounded-lg border border-border bg-page px-3 py-2 text-[13px] font-medium text-text-primary focus:border-accent focus:outline-none"
+            >
+              {steps.slice(nextIndex).map((name, i) => (
+                <option key={name} value={nextIndex + i}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-[11px] text-text-tertiary">Date reached</label>
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="mt-1 rounded-lg border border-border px-3 py-2 text-[13px] focus:border-accent focus:outline-none"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="text-[11px] text-text-tertiary">Reason / note</label>
+          <textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            rows={2}
+            placeholder="e.g. Cleared customs without issue, now heading inland"
+            className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-[13px] focus:border-accent focus:outline-none"
+          />
+        </div>
+
         <button
           type="submit"
           disabled={saving}
           className="rounded-lg bg-accent px-3.5 py-2 text-[13px] font-medium text-white hover:bg-accent/90 disabled:opacity-50"
         >
-          {saving ? "Saving…" : `Mark "${stageName}" reached`}
+          {saving ? "Sending…" : "Send update"}
         </button>
       </form>
 
       {error && <p className="mt-2 text-[12px] text-danger">{error}</p>}
-      {success && <p className="mt-2 text-[12px] text-success">Updated.</p>}
+      {success && <p className="mt-2 text-[12px] text-success">Sent — everyone on the team is notified.</p>}
     </div>
   );
 }
