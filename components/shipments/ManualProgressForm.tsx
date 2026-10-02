@@ -31,6 +31,11 @@ export function ManualProgressForm({
   const router = useRouter();
   const mombasaIndex = steps.indexOf("Mombasa Port");
   const mombasaMilestone = milestones[mombasaIndex];
+  // A stage that was reached late is still reached — its status stays
+  // "delayed" rather than flipping to "completed", so checking actualDate
+  // directly (not the status string) is what correctly distinguishes
+  // "hasn't arrived yet" from "arrived, on time or not".
+  const mombasaReached = Boolean(mombasaMilestone?.actualDate);
 
   // The next stage still needing a manual update — the first one after
   // Mombasa Port that isn't already marked completed.
@@ -43,7 +48,7 @@ export function ManualProgressForm({
 
   // Ocean leg isn't confirmed at Mombasa yet — nothing to mark manually
   // until Traqo (or a manual sync) confirms that first.
-  if (!mombasaMilestone || mombasaMilestone.status !== "completed") {
+  if (!mombasaReached) {
     return (
       <div className="rounded-xl border border-border bg-surface p-4">
         <div className="flex items-center gap-2">

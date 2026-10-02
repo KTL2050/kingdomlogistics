@@ -83,7 +83,15 @@ export function AuthCard() {
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName } },
+      options: {
+        data: { full_name: fullName },
+        // Without this, Supabase builds the confirmation link from the
+        // project's dashboard "Site URL" setting instead — which is what
+        // sent real users to localhost:3000 and broke every signup until
+        // that setting was fixed. This makes it resolve from wherever the
+        // app is actually running, matching handleForgotPassword below.
+        emailRedirectTo: typeof window !== "undefined" ? `${window.location.origin}/login` : undefined,
+      },
     });
     setLoading(false);
     if (error) {
