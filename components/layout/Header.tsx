@@ -128,6 +128,11 @@ export function Header({
                         <div className="mt-0.5 text-[11.5px] text-text-secondary">
                           {a.description}
                         </div>
+                        {a.managerNote && (
+                          <div className="mt-1 text-[11.5px] text-text-primary">
+                            <span className="font-medium text-info">Note:</span> {a.managerNote}
+                          </div>
+                        )}
                         <div className="mt-1 text-[10.5px] text-text-tertiary">
                           {a.timestamp}
                         </div>

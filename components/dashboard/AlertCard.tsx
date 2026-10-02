@@ -79,7 +79,10 @@ export function AlertCard({
         </button>
 
         {alert.managerNote && !editingNote && (
-          <div className="mt-2 rounded-md border border-info/20 bg-info-soft px-2.5 py-2">
+          <div
+            onClick={() => setDetailOpen(true)}
+            className="mt-2 cursor-pointer rounded-md border border-info/20 bg-info-soft px-2.5 py-2 hover:opacity-80"
+          >
             <p className="text-[10px] font-semibold uppercase tracking-wide text-info">
               Manager&apos;s note
             </p>
@@ -92,7 +95,10 @@ export function AlertCard({
         )}
 
         {alert.expectedNextStage && alert.expectedNextDate && !editingNote && (
-          <div className="mt-2 flex items-center gap-1.5 text-[11px] text-text-secondary">
+          <div
+            onClick={() => setDetailOpen(true)}
+            className="mt-2 flex cursor-pointer items-center gap-1.5 text-[11px] text-text-secondary hover:opacity-80"
+          >
             <Calendar className="h-3 w-3 shrink-0 text-text-tertiary" />
             Expected to reach {alert.expectedNextStage} by{" "}
             <span className="font-medium text-text-primary">{alert.expectedNextDate}</span>
