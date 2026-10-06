@@ -23,6 +23,11 @@ const STORE = { lat: 0.3396837, lng: 32.623353, label: "Store — Ntinda Industr
 
 type LatLng = { lat: number; lng: number };
 
+function hasRealPosition(s: Shipment) {
+  const { lat, lng } = s.position ?? {};
+  return typeof lat === "number" && typeof lng === "number" && !(lat === 0 && lng === 0);
+}
+
 /**
  * Splits one shipment's full route into the part already traveled
  * (solid line) and the part still ahead (dotted line). The solid line
@@ -37,18 +42,28 @@ function buildRouteSegments(shipment: Shipment): {
   traveled: [number, number][];
   remaining: [number, number][];
 } {
-  const milestoneStatus = (name: string) =>
-    shipment.milestones.find((m) => m.name === name)?.status;
+  // A stage that was reached late is "delayed", not "completed" — but it
+  // has still been reached, so both count as done here. Otherwise a
+  // container that arrived late at Mombasa gets its route drawn as if it
+  // were still at sea.
+  const isDone = (name: string) => {
+    const status = shipment.milestones.find((m) => m.name === name)?.status;
+    return status === "completed" || status === "delayed";
+  };
 
-  const mombasaDone = milestoneStatus("Mombasa Port") === "completed";
-  const icdDone = milestoneStatus("At ICD") === "completed";
-  const storeDone = milestoneStatus("Arrived at Store") === "completed";
+  const mombasaDone = isDone("Mombasa Port");
+  const icdDone = isDone("At ICD");
+  const storeDone = isDone("Arrived at Store");
 
   const toPairs = (points: LatLng[]) => points.map((p) => [p.lat, p.lng] as [number, number]);
   const waypointPoints: LatLng[] = (shipment.waypoints ?? []).map((w) => ({ lat: w.lat, lng: w.lng }));
 
   if (!mombasaDone) {
-    const pos = { lat: shipment.position.lat, lng: shipment.position.lng };
+    // A shipment that was never synced has the {0,0} placeholder
+    // position — drawing to it sends the line off into the Atlantic.
+    // Fall back to the last confirmed stop (or the origin) instead.
+    const lastStop = waypointPoints[waypointPoints.length - 1] ?? ORIGIN;
+    const pos = hasRealPosition(shipment) ? { lat: shipment.position.lat, lng: shipment.position.lng } : lastStop;
     return {
       traveled: toPairs([ORIGIN, ...waypointPoints, pos]),
       remaining: toPairs([pos, MOMBASA_PORT, KAMPALA_ICD, STORE]),
@@ -287,7 +302,7 @@ export default function TrackingMapInner({
           ))
         )}
 
-        {shipments.map((s) => (
+        {shipments.filter(hasRealPosition).map((s) => (
           <Marker
             key={s.id}
             position={[s.position.lat, s.position.lng]}
