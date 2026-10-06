@@ -49,6 +49,9 @@ export interface Milestone {
    * stage can't silently overwrite an earlier one's reason. */
   delayReason?: string;
   delayReportedAt?: string;
+  /** How late this stage's own arrival was — set when durations are
+   * re-evaluated; older milestones fall back to the shipment-wide figure. */
+  daysLate?: number;
 }
 
 export interface Waypoint {

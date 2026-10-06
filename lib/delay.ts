@@ -41,7 +41,21 @@ export function buildDelayReason(
   actualDateIso: string,
   daysLate: number
 ): string {
-  return `Delayed at ${stageName} — planned ${shortDate(plannedDateIso)}, arrived ${shortDate(
+  return `${autoDelayReasonPrefix(stageName)} ${shortDate(plannedDateIso)}, arrived ${shortDate(
     actualDateIso
   )} (${daysLate} day${daysLate === 1 ? "" : "s"} late).`;
+}
+
+function autoDelayReasonPrefix(stageName: string): string {
+  return `Delayed at ${stageName} — planned`;
+}
+
+/**
+ * True for text produced by buildDelayReason, false for anything a person
+ * typed. Lets a stale auto-generated "X days late" banner be cleared when
+ * the stage stops being late, without ever deleting a manager's own reason
+ * (which lives in the same field).
+ */
+export function isAutoDelayReason(stageName: string, reason: string): boolean {
+  return reason.startsWith(autoDelayReasonPrefix(stageName));
 }

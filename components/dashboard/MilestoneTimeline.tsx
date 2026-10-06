@@ -158,7 +158,7 @@ export function MilestoneTimeline({
                     {m.actualDate ?? "Not reached"}
                     {m.status === "delayed" && (
                       <div className="text-[10px] text-danger">
-                        ({shipment.delayDays} days late)
+                        ({m.daysLate ?? shipment.delayDays} days late)
                       </div>
                     )}
                   </div>

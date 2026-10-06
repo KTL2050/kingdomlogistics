@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { CheckCircle2, RotateCcw } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { computePlannedDates } from "@/lib/planning";
+import { reevaluateMilestones } from "@/lib/milestone-eval";
 import type { Milestone } from "@/types";
 
 interface Row {
@@ -122,16 +123,39 @@ export function ContainerStageDurationsPanel({
     const merged: Record<string, number> = {};
     for (const r of rows) merged[r.stepName] = r.overrideDays ?? r.defaultDays;
     const plannedDates = computePlannedDates(steps, etd, merged);
-    const updatedMilestones = milestones.map((m, i) => ({
+    const withNewPlan = milestones.map((m, i) => ({
       ...m,
       plannedDate: plannedDates[i]?.plannedDate ?? m.plannedDate,
       plannedDateIso: plannedDates[i]?.plannedDateIso ?? m.plannedDateIso,
       durationLabel: plannedDates[i]?.durationLabel ?? m.durationLabel,
     }));
 
+    // Moving planned dates isn't enough on its own: a stage flagged
+    // "delayed" under the old plan has to be re-checked against the new
+    // one, or it keeps showing a delay that no longer exists (and the
+    // reverse — a stage that's now later than planned).
+    const { milestones: updatedMilestones, hadDelay, hasDelay, maxDaysLate } =
+      reevaluateMilestones(withNewPlan, etd);
+
+    const shipmentUpdate: Record<string, unknown> = { milestones: updatedMilestones };
+    if (hasDelay) {
+      shipmentUpdate.health = "delayed";
+      shipmentUpdate.delay_days = maxDaysLate;
+    } else if (hadDelay) {
+      // Every delay just cleared — put the shipment back to whatever its
+      // real progress says, rather than leaving it stuck on "delayed".
+      const last = updatedMilestones[updatedMilestones.length - 1];
+      const progressed = updatedMilestones.some(
+        (m, i) => i > 0 && (m.actualDate || m.status === "current")
+      );
+      shipmentUpdate.health =
+        last?.status === "completed" ? "completed" : progressed ? "on_time" : "not_started";
+      shipmentUpdate.delay_days = 0;
+    }
+
     const { error: shipmentError } = await supabase
       .from("shipments")
-      .update({ milestones: updatedMilestones })
+      .update(shipmentUpdate)
       .eq("id", shipmentId);
 
     setSaving(false);
@@ -145,6 +169,13 @@ export function ContainerStageDurationsPanel({
 
   if (!supabase) return null;
 
+  // Live preview of where each stage lands with the numbers currently in
+  // the fields (saved or not) — so the effect of a change is visible
+  // before committing to it, instead of only after.
+  const previewDays: Record<string, number> = {};
+  for (const r of rows) previewDays[r.stepName] = r.overrideDays ?? r.defaultDays;
+  const preview = rows.length > 0 ? computePlannedDates(steps, etd, previewDays) : [];
+
   return (
     <div className="rounded-xl border border-border bg-surface p-5">
       <h2 className="text-[15px] font-semibold text-text-primary">
@@ -155,18 +186,30 @@ export function ContainerStageDurationsPanel({
         containers are unaffected. Leave a field blank to fall back to the
         default shown as its placeholder.
       </p>
+      <p className="mt-1 text-[12.5px] text-text-secondary">
+        Each number is how long the container is expected to stay at that
+        stage <span className="font-medium text-text-primary">before reaching the next one</span>.
+        So to set how long until it&apos;s loaded, change <em>Order Placed</em> — not
+        Container Loaded. The planned date under each stage updates as you type.
+      </p>
 
       {loading ? (
         <p className="mt-4 text-[13px] text-text-tertiary">Loading…</p>
       ) : (
         <>
           <div className="mt-4 space-y-2">
-            {rows.map((r) => (
+            {rows.map((r, i) => (
               <div
                 key={r.stepName}
                 className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2.5"
               >
-                <span className="text-[13px] text-text-primary">{r.stepName}</span>
+                <div className="min-w-0">
+                  <div className="text-[13px] text-text-primary">{r.stepName}</div>
+                  <div className="text-[11px] text-text-tertiary">
+                    Planned {preview[i]?.plannedDate ?? "—"}
+                    {steps[i + 1] && <> · days until {steps[i + 1]}</>}
+                  </div>
+                </div>
                 <div className="flex shrink-0 items-center gap-1.5">
                   <input
                     type="number"

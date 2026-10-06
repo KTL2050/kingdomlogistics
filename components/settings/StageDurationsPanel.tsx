@@ -78,18 +78,31 @@ export function StageDurationsPanel() {
         can override these from its own detail page, so this is a
         fallback, not a fixed rule.
       </p>
+      <p className="mt-1 text-[12.5px] text-text-secondary">
+        Each number is how long a container stays at that stage{" "}
+        <span className="font-medium text-text-primary">before reaching the next one</span> — so
+        how long until it&apos;s loaded is set on <em>Order Placed</em>, and the
+        sea voyage on <em>On the High Seas</em>.
+      </p>
 
       {loading ? (
         <p className="mt-4 text-[13px] text-text-tertiary">Loading…</p>
       ) : (
         <>
           <div className="mt-4 space-y-2">
-            {rows.map((r) => (
+            {rows.map((r, i) => (
               <div
                 key={r.step_name}
                 className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2.5"
               >
-                <span className="text-[13px] text-text-primary">{r.step_name}</span>
+                <div>
+                  <div className="text-[13px] text-text-primary">{r.step_name}</div>
+                  {rows[i + 1] && (
+                    <div className="text-[11px] text-text-tertiary">
+                      days until {rows[i + 1].step_name}
+                    </div>
+                  )}
+                </div>
                 <div className="flex shrink-0 items-center gap-1.5">
                   <input
                     type="number"
