@@ -56,16 +56,25 @@ function buildRouteSegments(shipment: Shipment): {
   const storeDone = isDone("Arrived at Store");
 
   const toPairs = (points: LatLng[]) => points.map((p) => [p.lat, p.lng] as [number, number]);
-  const waypointPoints: LatLng[] = (shipment.waypoints ?? []).map((w) => ({ lat: w.lat, lng: w.lng }));
+  const allWaypoints: LatLng[] = (shipment.waypoints ?? []).map((w) => ({ lat: w.lat, lng: w.lng }));
+
+  // Where the route starts. Shekou is only the default — if the first
+  // confirmed stop is a Chinese port (east of 105°E), that's where this
+  // container really loaded, so start there instead of drawing a line
+  // from Shekou to a port it never visited.
+  const first = allWaypoints[0];
+  const startsInChina = !!first && first.lng > 105 && first.lat > 15;
+  const origin: LatLng = startsInChina ? first : ORIGIN;
+  const waypointPoints = startsInChina ? allWaypoints.slice(1) : allWaypoints;
 
   if (!mombasaDone) {
     // A shipment that was never synced has the {0,0} placeholder
     // position — drawing to it sends the line off into the Atlantic.
     // Fall back to the last confirmed stop (or the origin) instead.
-    const lastStop = waypointPoints[waypointPoints.length - 1] ?? ORIGIN;
+    const lastStop = waypointPoints[waypointPoints.length - 1] ?? origin;
     const pos = hasRealPosition(shipment) ? { lat: shipment.position.lat, lng: shipment.position.lng } : lastStop;
     return {
-      traveled: toPairs([ORIGIN, ...waypointPoints, pos]),
+      traveled: toPairs([origin, ...waypointPoints, pos]),
       remaining: toPairs([pos, MOMBASA_PORT, KAMPALA_ICD, STORE]),
     };
   }
@@ -73,7 +82,7 @@ function buildRouteSegments(shipment: Shipment): {
   // Ocean leg is fully done — the solid line covers origin through every
   // real waypoint to Mombasa, and how far it continues inland depends
   // on manually-updated milestones.
-  const traveled: LatLng[] = [ORIGIN, ...waypointPoints, MOMBASA_PORT];
+  const traveled: LatLng[] = [origin, ...waypointPoints, MOMBASA_PORT];
   const remaining: LatLng[] = [];
 
   if (!icdDone) {
