@@ -1,7 +1,7 @@
 import type { Milestone } from "@/types";
 import type { TraqoEvent } from "@/lib/traqo/client";
 import type { PlannedStep } from "@/lib/planning";
-import { checkDelay } from "@/lib/delay";
+import { buildDelayReason, checkDelay, isAutoDelayReason } from "@/lib/delay";
 
 /**
  * Traqo (like any ocean-carrier tracker) only ever sees the port-to-port
@@ -160,6 +160,7 @@ export function applyTraqoEventsToMilestones(
     else if (i === currentIndex) status = "current";
 
     const stepEvent = eventForStep.get(i);
+    let daysLate: number | undefined;
 
     // A step whose real arrival date just came in — check it against
     // its planned date. Only the step that JUST got confirmed this
@@ -170,6 +171,7 @@ export function applyTraqoEventsToMilestones(
       const delayResult = checkDelay(planned?.plannedDateIso, stepEvent.timestamp);
       if (delayResult.isDelayed) {
         status = "delayed";
+        daysLate = delayResult.daysLate;
         if (existing?.status !== "delayed") {
           newDelay = {
             name,
@@ -178,6 +180,22 @@ export function applyTraqoEventsToMilestones(
             daysLate: delayResult.daysLate,
           };
         }
+      }
+    }
+
+    // This object is rebuilt from scratch every sync, so anything not
+    // copied over is lost — including a reason a manager typed for this
+    // stage. Auto-generated "X days late" text is the exception: it
+    // quotes specific dates, so it's refreshed while the stage is still
+    // late and dropped once it isn't, instead of going stale.
+    let delayReason = existing?.delayReason;
+    let delayReportedAt = existing?.delayReportedAt;
+    if (delayReason && isAutoDelayReason(name, delayReason)) {
+      if (status === "delayed" && stepEvent && planned && daysLate !== undefined) {
+        delayReason = buildDelayReason(name, planned.plannedDateIso, stepEvent.timestamp, daysLate);
+      } else {
+        delayReason = undefined;
+        delayReportedAt = undefined;
       }
     }
 
@@ -194,6 +212,8 @@ export function applyTraqoEventsToMilestones(
         ? existing?.actualDate ?? null // implied complete (a later step fired) but no direct event for this one
         : null,
       durationLabel: planned?.durationLabel ?? existing?.durationLabel ?? "",
+      ...(daysLate !== undefined ? { daysLate } : {}),
+      ...(delayReason ? { delayReason, delayReportedAt } : {}),
     };
   });
 
