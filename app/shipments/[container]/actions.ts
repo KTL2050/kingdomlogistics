@@ -98,7 +98,7 @@ async function syncShipmentTracking({
     // this is what lets the map draw the route through Singapore (or
     // wherever else) instead of just a straight guess, and also gives us
     // a trustworthy fallback position below.
-    const waypoints = buildWaypoints(result.data.events_table);
+    const waypoints = await buildWaypoints(result.data.events_table);
 
     // Traqo returns the vessel's real live position (lat/lng) — when
     // present, this is what moves the dot on the shared map from the
