@@ -144,6 +144,30 @@ function waypointIcon() {
   });
 }
 
+// One colour per container, in list order, so a line can be matched to
+// its container at a glance (and to the legend).
+const ROUTE_COLORS = ["#2563eb", "#7c3aed", "#0d9488", "#db2777", "#ea580c", "#4d7c0f"];
+function routeColor(index: number) {
+  return ROUTE_COLORS[index % ROUTE_COLORS.length];
+}
+
+function escapeHtml(text: string) {
+  return text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+}
+
+// Small name tag sitting on a container's route line.
+function labelIcon(text: string, color: string) {
+  return L.divIcon({
+    className: "",
+    html: `<div style="
+        transform:translate(-50%,-50%);display:inline-block;white-space:nowrap;
+        background:${color};color:white;font-size:11px;font-weight:600;line-height:1;
+        padding:4px 8px;border-radius:9999px;border:2px solid white;
+        box-shadow:0 1px 4px rgba(15,23,42,0.4);">${escapeHtml(text)}</div>`,
+    iconSize: [0, 0],
+  });
+}
+
 function dotIcon(color: string) {
   return L.divIcon({
     className: "",
@@ -225,6 +249,17 @@ export default function TrackingMapInner({
         Live tracking
       </div>
 
+      {shipments.length > 0 && (
+        <div className="absolute left-4 top-14 z-[1000] flex flex-col gap-1 rounded-lg border border-border-strong bg-surface/95 px-3 py-2 text-[12px] text-text-primary shadow-sm">
+          {shipments.map((s, idx) => (
+            <div key={s.id} className="flex items-center gap-2">
+              <span className="h-1 w-5 rounded-full" style={{ background: routeColor(idx) }} />
+              <span className="font-medium">{s.containerNumber}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
       <MapContainer
         center={[15, 55]}
         zoom={3}
@@ -238,15 +273,28 @@ export default function TrackingMapInner({
           attribution="Tiles &copy; Esri"
         />
 
-        {shipments.map((s) => {
+        {shipments.map((s, idx) => {
           const { traveled, remaining } = buildRouteSegments(s);
+          const color = routeColor(idx);
+          // Label sits partway along the last traveled segment, at a
+          // different fraction per container so two containers sharing
+          // the same route don't stack their labels on top of each other.
+          const fraction = shipments.length > 1 ? 0.25 + (0.5 * idx) / (shipments.length - 1) : 0.5;
+          const [from, to] = traveled.slice(-2);
+          const labelPos: [number, number] | null =
+            from && to
+              ? [from[0] + (to[0] - from[0]) * fraction, from[1] + (to[1] - from[1]) * fraction]
+              : null;
           return (
             <Fragment key={s.id}>
               {traveled.length > 1 && (
                 <Polyline
                   positions={traveled}
-                  pathOptions={{ color: "#2563eb", weight: 4, lineCap: "round" }}
+                  pathOptions={{ color, weight: 4, lineCap: "round" }}
                 />
+              )}
+              {labelPos && (
+                <Marker position={labelPos} icon={labelIcon(s.containerNumber, color)} interactive={false} />
               )}
               {remaining.length > 1 && (
                 <Polyline
