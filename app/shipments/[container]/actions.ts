@@ -11,6 +11,49 @@ import { buildWaypoints } from "@/lib/waypoints";
 import { getCurrentUser, getShipments } from "@/lib/data";
 import type { Milestone } from "@/types";
 
+// Index of the furthest stage the container has reached (or is at) — -1
+// if none. A stage that was reached late is "delayed", but it has still
+// been reached, so it counts.
+function furthestReachedIndex(milestones: Milestone[]): number {
+  let furthest = -1;
+  milestones.forEach((m, i) => {
+    if (m.status === "current" || m.status === "completed" || m.status === "delayed") furthest = i;
+  });
+  return furthest;
+}
+
+function describeStageReached(
+  containerNumber: string,
+  stageName: string,
+  nextStageName: string | undefined
+): { title: string; description: string } {
+  const informedNext = nextStageName
+    ? `You will be informed when it reaches ${nextStageName}.`
+    : "This is the final stage.";
+  switch (stageName) {
+    case "Container Loaded":
+      return {
+        title: `${containerNumber} has been loaded`,
+        description: `${containerNumber} is loaded on the vessel. ${informedNext}`,
+      };
+    case "On the High Seas":
+      return {
+        title: `${containerNumber} is on the High Seas`,
+        description: `${containerNumber} has set sail. ${informedNext}`,
+      };
+    case "Mombasa Port":
+      return {
+        title: `${containerNumber} has reached Mombasa Port`,
+        description: `${containerNumber} has arrived at Mombasa Port. Carrier tracking ends here, so the inland leg will be updated by the Logistics Manager.`,
+      };
+    default:
+      return {
+        title: `${containerNumber}: ${stageName}`,
+        description: `${containerNumber} has reached ${stageName}. ${informedNext}`,
+      };
+  }
+}
+
 export async function syncTracking({
   shipmentId,
   containerNumber,
@@ -188,6 +231,29 @@ async function syncShipmentTracking({
       });
       if (alertError) {
         console.error("Failed to create delay alert after tracking sync:", alertError.message);
+      }
+    }
+
+    // Tell the team when the container moves on to a new stage — only on
+    // the sync that first sees it there, so a refresh with no change
+    // stays silent. If it jumped several stages between syncs, one alert
+    // for the stage it's actually at now is enough. "Order Placed" is
+    // skipped: it's set when the container is created, not by tracking.
+    const previousStage = furthestReachedIndex(existingMilestones);
+    const currentStage = furthestReachedIndex(milestonesWithReason);
+    if (currentStage > previousStage && currentStage >= 1) {
+      const stageName = steps[currentStage];
+      const nextName = steps[currentStage + 1];
+      const { title, description } = describeStageReached(containerNumber, stageName, nextName);
+      const { error: progressAlertError } = await supabase.from("alerts").insert({
+        severity: "info",
+        shipment_number: containerNumber,
+        title,
+        description,
+        acknowledged: false,
+      });
+      if (progressAlertError) {
+        console.error("Failed to create stage-progress alert after tracking sync:", progressAlertError.message);
       }
     }
 
