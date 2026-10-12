@@ -1,10 +1,12 @@
 import type { Alert, AppUser, KpiSummary, PlannedOrder, Shipment } from "@/types";
 import {
   alerts as mockAlerts,
+  getRouteStepsForContainer,
   currentUser,
   plannedOrders as mockPlannedOrders,
   shipments as mockShipments,
 } from "@/lib/mock-data";
+import { alignMilestonesToRoute } from "@/lib/milestones";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -40,7 +42,10 @@ function mapShipmentRow(row: Record<string, unknown>): Shipment {
     delayDays: (row.delay_days as number) ?? 0,
     customer: row.customer as string,
     position: (row.position as Shipment["position"]) ?? { lat: 0, lng: 0, label: "" },
-    milestones: Array.isArray(row.milestones) ? (row.milestones as Shipment["milestones"]) : [],
+    milestones: alignMilestonesToRoute(
+      getRouteStepsForContainer(row.container_number as string),
+      Array.isArray(row.milestones) ? (row.milestones as Shipment["milestones"]) : []
+    ),
     waypoints: Array.isArray(row.waypoints) ? (row.waypoints as Shipment["waypoints"]) : [],
     delayReason: (row.delay_reason as string | null) ?? undefined,
     delayReportedAt: (row.delay_reported_at as string | null) ?? undefined,

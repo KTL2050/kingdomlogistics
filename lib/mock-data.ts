@@ -15,12 +15,29 @@ export const ROUTE_STEPS_ICD = [
   "Arrived at Store",
 ] as const;
 
+// Aiwibi Uganda only: goods are manufactured and packed before they can be loaded.
+export const MANUFACTURING_STEP = "Manufacturing and Packaging";
+
 export const ROUTE_STEPS_DIRECT = [
   "Order Placed",
+  "Manufacturing and Packaging",
   "Container Loaded",
   "On the High Seas",
   "Mombasa Port",
   "Enroute to Kampala",
+  "Arrived at Store",
+] as const;
+
+// Every stage name any route can contain, in route order — for screens that
+// list stages without belonging to one container (default durations).
+export const ROUTE_STEPS_ALL = [
+  "Order Placed",
+  "Manufacturing and Packaging",
+  "Container Loaded",
+  "On the High Seas",
+  "Mombasa Port",
+  "Enroute to Kampala",
+  "At ICD",
   "Arrived at Store",
 ] as const;
 
@@ -222,13 +239,14 @@ export const shipments: Shipment[] = [
       ROUTE_STEPS_DIRECT,
       [
         { planned: "01 Apr", actual: "01 Apr", duration: "7-14 days" },
+        { planned: "05 Apr", actual: "05 Apr", duration: "5 days" },
         { planned: "10 Apr", actual: "10 Apr", duration: "2 days" },
         { planned: "13 Apr", actual: "13 Apr", duration: "35 days" },
         { planned: "18 Apr", actual: "18 Apr", duration: "3 days" },
         { planned: "21 Apr", actual: "21 Apr", duration: "3 days" },
         { planned: "24 Apr", actual: "24 Apr", duration: "1 day" },
       ],
-      6,
+      7,
       false
     ),
   },
@@ -428,6 +446,7 @@ export const shipments: Shipment[] = [
       ROUTE_STEPS_DIRECT,
       [
         { planned: "27 Apr", actual: null, duration: "7-14 days" },
+        { planned: "02 May", actual: null, duration: "5 days" },
         { planned: "09 May", actual: null, duration: "2 days" },
         { planned: "13 May", actual: null, duration: "35 days" },
         { planned: "18 May", actual: null, duration: "3 days" },

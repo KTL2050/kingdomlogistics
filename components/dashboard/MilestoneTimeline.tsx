@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   Anchor,
   ClipboardList,
+  Factory,
   Home,
   MessageSquarePlus,
   Package,
@@ -16,7 +17,16 @@ import { cn, milestoneStyles } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { MilestoneReasonModal } from "@/components/dashboard/MilestoneReasonModal";
 
-const STEP_ICONS = [ClipboardList, Package, Ship, Anchor, Truck, Home, Home];
+const STEP_ICONS: Record<string, typeof Package> = {
+  "Order Placed": ClipboardList,
+  "Manufacturing and Packaging": Factory,
+  "Container Loaded": Package,
+  "On the High Seas": Ship,
+  "Mombasa Port": Anchor,
+  "Enroute to Kampala": Truck,
+  "At ICD": Home,
+  "Arrived at Store": Home,
+};
 
 export function MilestoneTimeline({
   shipment,
@@ -96,7 +106,7 @@ export function MilestoneTimeline({
       <div className="mt-4 flex items-start overflow-x-auto pb-1">
         {shipment.milestones.map((m, i) => {
           const style = milestoneStyles[m.status];
-          const Icon = STEP_ICONS[i] ?? Package;
+          const Icon = STEP_ICONS[m.name] ?? Package;
           const isLast = i === shipment.milestones.length - 1;
           return (
             <div

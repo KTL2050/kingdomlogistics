@@ -15,6 +15,7 @@ const SIZES: ContainerSize[] = ["20ft", "40ft", "40ft HC", "45ft"];
 // across the sample data.
 const FALLBACK_DAYS: Record<string, number> = {
   "Order Placed": 10,
+  "Manufacturing and Packaging": 1,
   "Container Loaded": 2,
   "On the High Seas": 35,
   "Mombasa Port": 3,

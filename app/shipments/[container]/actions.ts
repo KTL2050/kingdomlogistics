@@ -8,6 +8,7 @@ import { getRouteStepsForContainer } from "@/lib/mock-data";
 import { computePlannedDates } from "@/lib/planning";
 import { buildDelayReason } from "@/lib/delay";
 import { buildWaypoints } from "@/lib/waypoints";
+import { alignMilestonesToRoute } from "@/lib/milestones";
 import { getCurrentUser, getShipments } from "@/lib/data";
 import type { Milestone } from "@/types";
 
@@ -102,7 +103,10 @@ async function syncShipmentTracking({
       .single();
 
     const steps = getRouteStepsForContainer(containerNumber);
-    const existingMilestones = (row?.milestones as Milestone[] | null) ?? [];
+    const existingMilestones = alignMilestonesToRoute(
+      steps,
+      (row?.milestones as Milestone[] | null) ?? []
+    );
 
     // Stage Durations (set in Settings by Admin/Logistics Manager/
     // Operations Officer) is what actually computes "Planned" dates —

@@ -5,6 +5,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { MilestoneTimeline } from "@/components/dashboard/MilestoneTimeline";
 import { TrackingForm } from "@/components/shipments/TrackingForm";
 import { ManualProgressForm } from "@/components/shipments/ManualProgressForm";
+import { ManufacturingProgressForm } from "@/components/shipments/ManufacturingProgressForm";
 import { ContainerStageDurationsPanel } from "@/components/shipments/ContainerStageDurationsPanel";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { CompanyBadge } from "@/components/ui/CompanyBadge";
@@ -73,6 +74,18 @@ export default async function ShipmentDetailPage({
           lastSyncedAt={shipment.trackingLastSyncedAt}
         />
       </div>
+
+      {canSendUpdate && (
+        <div className="mb-4">
+          <ManufacturingProgressForm
+            shipmentId={shipment.id}
+            containerNumber={shipment.containerNumber}
+            steps={getRouteStepsForContainer(shipment.containerNumber)}
+            milestones={shipment.milestones}
+            currentUserName={user.fullName}
+          />
+        </div>
+      )}
 
       {canSendUpdate && (
         <div className="mb-4">

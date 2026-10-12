@@ -161,6 +161,13 @@ export function applyTraqoEventsToMilestones(
 
     const stepEvent = eventForStep.get(i);
     let daysLate: number | undefined;
+    // A stage the carrier never reports on (Manufacturing and Packaging) can
+    // have been marked late by hand; a refresh must not quietly turn that
+    // back into "completed".
+    if (!stepEvent && existing?.status === "delayed" && i <= currentIndex) {
+      status = "delayed";
+      daysLate = existing.daysLate;
+    }
 
     // A step whose real arrival date just came in — check it against
     // its planned date. Only the step that JUST got confirmed this
@@ -193,7 +200,7 @@ export function applyTraqoEventsToMilestones(
     if (delayReason && isAutoDelayReason(name, delayReason)) {
       if (status === "delayed" && stepEvent && planned && daysLate !== undefined) {
         delayReason = buildDelayReason(name, planned.plannedDateIso, stepEvent.timestamp, daysLate);
-      } else {
+      } else if (status !== "delayed") {
         delayReason = undefined;
         delayReportedAt = undefined;
       }

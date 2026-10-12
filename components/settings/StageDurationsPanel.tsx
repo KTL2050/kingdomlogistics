@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
-import { ROUTE_STEPS_ICD } from "@/lib/mock-data";
+import { MANUFACTURING_STEP, ROUTE_STEPS_ALL } from "@/lib/mock-data";
 
 interface StageDuration {
   id: string;
@@ -28,7 +28,7 @@ export function StageDurationsPanel() {
       // Always show every step from the full (Uncle Bills / ICD) route,
       // in route order — Aiwibi Uganda's route is a subset of the same
       // step names, so one ordered list covers both.
-      const ordered = ROUTE_STEPS_ICD.map(
+      const ordered = ROUTE_STEPS_ALL.map(
         (name) =>
           byName.get(name) ?? {
             id: name,
@@ -97,9 +97,14 @@ export function StageDurationsPanel() {
               >
                 <div>
                   <div className="text-[13px] text-text-primary">{r.step_name}</div>
+                  {r.step_name === MANUFACTURING_STEP && (
+                    <div className="text-[11px] font-medium text-accent">Aiwibi Uganda only</div>
+                  )}
                   {rows[i + 1] && (
                     <div className="text-[11px] text-text-tertiary">
-                      days until {rows[i + 1].step_name}
+                      {rows[i + 1].step_name === MANUFACTURING_STEP
+                        ? `days until ${MANUFACTURING_STEP} (Aiwibi) or Container Loaded (Uncle Bills)`
+                        : `days until ${rows[i + 1].step_name}`}
                     </div>
                   )}
                 </div>

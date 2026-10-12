@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, Ship, Truck, Home, AlertCircle, CheckCircle2 } from "lucide-react";
+import { ChevronRight, Ship, Truck, Home, AlertCircle, CheckCircle2, Package } from "lucide-react";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import type { Shipment } from "@/types";
 import { cn, getCompanyForContainer } from "@/lib/utils";
@@ -10,6 +10,7 @@ const STATUS_ICON: Record<string, typeof Ship> = {
   "At ICD": Home,
   "Mombasa Port": Ship,
   "Order Placed": AlertCircle,
+  "Manufacturing and Packaging": Package,
   "Container Loaded": AlertCircle,
   "Arrived at Store": CheckCircle2,
 };
