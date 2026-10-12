@@ -74,7 +74,11 @@ export function AppChrome({
         />
         <main className="flex-1 px-4 py-4 sm:px-6">{children}</main>
       </div>
-      <ChatWidget userName={userName} userRole={userRole} />
+      <ChatWidget
+        userName={userName}
+        userRole={userRole}
+        containers={shipments.map((s) => ({ number: s.containerNumber, status: s.currentStatus }))}
+      />
     </div>
   );
 }

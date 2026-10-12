@@ -551,3 +551,42 @@ create policy "Approved users can upload chat attachments"
     bucket_id = 'chat-attachments'
     and exists (select 1 from users where users.id = auth.uid() and users.status = 'approved')
   );
+
+-- Container conversations: same table as the team chat. container_number
+-- null = the general team room, set = that container's conversation.
+alter table chat_messages add column if not exists container_number text;
+create index if not exists idx_chat_messages_container on chat_messages (container_number, created_at desc);
+
+create table if not exists chat_thread_reads (
+  user_id uuid not null references users (id) on delete cascade,
+  container_number text not null,
+  last_read_at timestamptz not null default now(),
+  primary key (user_id, container_number)
+);
+
+alter table chat_thread_reads enable row level security;
+
+drop policy if exists "Users manage their own chat_thread_reads" on chat_thread_reads;
+create policy "Users manage their own chat_thread_reads"
+  on chat_thread_reads for all to authenticated
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- Replaces the earlier post rule: a team message is open to every approved
+-- user, but the FIRST message about a container must come from an Admin or
+-- Logistics Manager. Once a conversation exists, anyone approved can reply.
+drop policy if exists "Approved users can post chat_messages" on chat_messages;
+create policy "Approved users can post chat_messages"
+  on chat_messages for insert to authenticated with check (
+    user_id = auth.uid()
+    and exists (select 1 from users where users.id = auth.uid() and users.status = 'approved')
+    and (
+      container_number is null
+      or exists (
+        select 1 from users
+        where users.id = auth.uid() and users.role in ('Admin', 'Logistics Manager')
+      )
+      or exists (
+        select 1 from chat_messages m where m.container_number = chat_messages.container_number
+      )
+    )
+  );
