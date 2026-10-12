@@ -480,3 +480,74 @@ create policy "Managers and officers can update planned_orders"
   );
 
 alter publication supabase_realtime add table planned_orders;
+
+-- ---------------------------------------------------------------------
+-- Team chat: one shared room for every approved user, plus a per-user
+-- "last read" marker that drives the unread badge.
+-- ---------------------------------------------------------------------
+
+create table if not exists chat_messages (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references users (id) on delete cascade,
+  sender_name text not null,
+  sender_role text not null,
+  body text,
+  attachment_path text,
+  attachment_name text,
+  attachment_type text,
+  created_at timestamptz not null default now(),
+  constraint chat_message_has_content check (body is not null or attachment_path is not null)
+);
+
+create index if not exists idx_chat_messages_created_at on chat_messages (created_at desc);
+
+create table if not exists chat_reads (
+  user_id uuid primary key references users (id) on delete cascade,
+  last_read_at timestamptz not null default now()
+);
+
+alter table chat_messages enable row level security;
+alter table chat_reads enable row level security;
+
+drop policy if exists "Approved users can read chat_messages" on chat_messages;
+create policy "Approved users can read chat_messages"
+  on chat_messages for select to authenticated using (
+    exists (select 1 from users where users.id = auth.uid() and users.status = 'approved')
+  );
+
+drop policy if exists "Approved users can post chat_messages" on chat_messages;
+create policy "Approved users can post chat_messages"
+  on chat_messages for insert to authenticated with check (
+    user_id = auth.uid()
+    and exists (select 1 from users where users.id = auth.uid() and users.status = 'approved')
+  );
+
+drop policy if exists "Users manage their own chat_reads" on chat_reads;
+create policy "Users manage their own chat_reads"
+  on chat_reads for all to authenticated
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+do $$ begin
+  alter publication supabase_realtime add table chat_messages;
+exception when duplicate_object then null;
+end $$;
+
+-- Private bucket: files are only reachable through short-lived signed
+-- links, never a public URL. 10 MB per file.
+insert into storage.buckets (id, name, public, file_size_limit)
+values ('chat-attachments', 'chat-attachments', false, 10485760)
+on conflict (id) do nothing;
+
+drop policy if exists "Approved users can read chat attachments" on storage.objects;
+create policy "Approved users can read chat attachments"
+  on storage.objects for select to authenticated using (
+    bucket_id = 'chat-attachments'
+    and exists (select 1 from users where users.id = auth.uid() and users.status = 'approved')
+  );
+
+drop policy if exists "Approved users can upload chat attachments" on storage.objects;
+create policy "Approved users can upload chat attachments"
+  on storage.objects for insert to authenticated with check (
+    bucket_id = 'chat-attachments'
+    and exists (select 1 from users where users.id = auth.uid() and users.status = 'approved')
+  );
