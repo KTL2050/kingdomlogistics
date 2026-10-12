@@ -574,6 +574,20 @@ create policy "Users manage their own chat_thread_reads"
 -- Replaces the earlier post rule: a team message is open to every approved
 -- user, but the FIRST message about a container must come from an Admin or
 -- Logistics Manager. Once a conversation exists, anyone approved can reply.
+-- Whether a container already has a conversation. A function (not a
+-- subquery inside the policy itself) because a policy that reads its own
+-- table fails with "infinite recursion detected in policy". security
+-- definer lets the lookup run without re-triggering the table's policies.
+create or replace function chat_thread_exists(container text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (select 1 from chat_messages where container_number = container);
+$$;
+
 drop policy if exists "Approved users can post chat_messages" on chat_messages;
 create policy "Approved users can post chat_messages"
   on chat_messages for insert to authenticated with check (
@@ -585,8 +599,25 @@ create policy "Approved users can post chat_messages"
         select 1 from users
         where users.id = auth.uid() and users.role in ('Admin', 'Logistics Manager')
       )
-      or exists (
-        select 1 from chat_messages m where m.container_number = chat_messages.container_number
-      )
+      or chat_thread_exists(container_number)
     )
   );
+
+-- @tags: who a message tags — user ids, 'everyone', or 'role:<Role name>'.
+alter table chat_messages add column if not exists mentions text[] not null default '{}';
+
+-- The people list for the @ autocomplete. A function so it works for every
+-- role without depending on who is allowed to read the users table.
+create or replace function chat_members()
+returns table (id uuid, full_name text, role text)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select u.id, u.full_name, u.role
+  from users u
+  where u.status = 'approved'
+    and exists (select 1 from users me where me.id = auth.uid() and me.status = 'approved')
+  order by u.full_name;
+$$;

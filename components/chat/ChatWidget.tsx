@@ -16,6 +16,8 @@ interface ChatMessage {
   attachment_type: string | null;
   // null = the general team room; set = that container's conversation.
   container_number: string | null;
+  // Who this message tags: user ids, "everyone", or "role:<Role name>".
+  mentions: string[];
   created_at: string;
 }
 
@@ -24,8 +26,31 @@ interface ChatContainer {
   status: string;
 }
 
+interface Member {
+  id: string;
+  full_name: string;
+  role: string;
+}
+
+interface MentionOption {
+  token: string; // what gets stored in chat_messages.mentions
+  label: string; // what is typed/shown after the @
+  hint: string;
+}
+
+const GROUP_MENTIONS: MentionOption[] = [
+  { token: "everyone", label: "Everyone", hint: "The whole team" },
+  { token: "role:Admin", label: "Admins", hint: "Everyone with the Admin role" },
+  { token: "role:Logistics Manager", label: "LogisticsManagers", hint: "All Logistics Managers" },
+  { token: "role:Operations Officer", label: "OperationsOfficers", hint: "All Operations Officers" },
+  { token: "role:Viewer", label: "Viewers", hint: "All Viewers" },
+];
+
 const BUCKET = "chat-attachments";
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
+
+const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, "");
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleString("en-GB", {
@@ -34,6 +59,30 @@ function formatTime(iso: string) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+// Highlights @Name for every known name (longest first, so "@Nsuga Moses"
+// isn't cut short by a shorter name that is a prefix of it).
+function renderBody(text: string, names: string[], mine: boolean) {
+  if (names.length === 0) return text;
+  const pattern = new RegExp(`@(?:${names.map(escapeRegExp).join("|")})(?!\\w)`, "gi");
+  const parts: React.ReactNode[] = [];
+  let last = 0;
+  for (const match of text.matchAll(pattern)) {
+    const start = match.index ?? 0;
+    if (start > last) parts.push(text.slice(last, start));
+    parts.push(
+      <span
+        key={start}
+        className={cn("rounded px-1 font-medium", mine ? "bg-white/25" : "bg-accent-soft text-accent")}
+      >
+        {match[0]}
+      </span>
+    );
+    last = start + match[0].length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return parts;
 }
 
 // The bucket is private, so a file is shown through a short-lived signed
@@ -104,6 +153,10 @@ export function ChatWidget({
   const [activeContainer, setActiveContainer] = useState<string | null>(null);
   const [pickedContainer, setPickedContainer] = useState("");
   const [threadReads, setThreadReads] = useState<Record<string, string>>({});
+  const [teamLastRead, setTeamLastRead] = useState<string | undefined>(undefined);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [pickedMentions, setPickedMentions] = useState<MentionOption[]>([]);
+  const [mentionIndex, setMentionIndex] = useState(0);
 
   // Refs so the realtime listener (set up once) always sees current values.
   const viewRef = useRef<{ open: boolean; tab: "team" | "containers"; thread: string | null }>({
@@ -114,20 +167,22 @@ export function ChatWidget({
   const myIdRef = useRef<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     viewRef.current = { open, tab, thread: activeContainer };
   }, [open, tab, activeContainer]);
 
-  const markRead = useCallback(async (userId: string) => {
+  // upTo is a message's own server timestamp when there is one, not this
+  // device's clock, so a wrong local clock can't leave read messages
+  // looking unread.
+  const markRead = useCallback(async (userId: string, upTo?: string) => {
     if (!supabase) return;
-    await supabase
-      .from("chat_reads")
-      .upsert({ user_id: userId, last_read_at: new Date().toISOString() });
+    const at = upTo ?? new Date().toISOString();
+    setTeamLastRead(at);
+    await supabase.from("chat_reads").upsert({ user_id: userId, last_read_at: at });
   }, []);
 
-  // upTo is a message's own server timestamp, not this device's clock, so
-  // a wrong local clock can't leave a read thread looking unread.
   const markThreadRead = useCallback(async (userId: string, container: string, upTo: string) => {
     if (!supabase) return;
     setThreadReads((prev) => ({ ...prev, [container]: upTo }));
@@ -177,7 +232,15 @@ export function ChatWidget({
         )
       );
 
+      // The people list for the @ autocomplete. If the chat_members
+      // function isn't in the database yet this just comes back empty and
+      // only Everyone and the role tags are offered.
+      const { data: memberRows } = await client.rpc("chat_members");
+      if (cancelled) return;
+      setMembers((memberRows ?? []) as Member[]);
+
       const lastRead = read?.last_read_at as string | undefined;
+      setTeamLastRead(lastRead);
       if (lastRead) {
         const { count } = await client
           .from("chat_messages")
@@ -211,7 +274,7 @@ export function ChatWidget({
               }
               return;
             }
-            if (view.open && view.tab === "team") void markRead(uid);
+            if (view.open && view.tab === "team") void markRead(uid, msg.created_at);
             else setUnread((n) => n + 1);
           }
         )
@@ -234,25 +297,63 @@ export function ChatWidget({
   const teamMessages = messages.filter((m) => !m.container_number);
   const time = (iso: string | undefined) => (iso ? new Date(iso).getTime() : 0);
 
-  const threadMap = new Map<string, { last: ChatMessage; unread: number }>();
+  // A message tags me if it names me, everyone, or my role — and I didn't
+  // write it myself.
+  const mentionsMe = (m: ChatMessage) =>
+    m.user_id !== myId &&
+    (m.mentions ?? []).some((t) => t === myId || t === "everyone" || t === `role:${userRole}`);
+
+  const threadMap = new Map<string, { last: ChatMessage; unread: number; mentions: number }>();
   for (const m of messages) {
     if (!m.container_number) continue;
-    const t = threadMap.get(m.container_number) ?? { last: m, unread: 0 };
+    const t = threadMap.get(m.container_number) ?? { last: m, unread: 0, mentions: 0 };
     if (time(m.created_at) >= time(t.last.created_at)) t.last = m;
-    if (m.user_id !== myId && time(m.created_at) > time(threadReads[m.container_number])) t.unread += 1;
+    if (m.user_id !== myId && time(m.created_at) > time(threadReads[m.container_number])) {
+      t.unread += 1;
+      if (mentionsMe(m)) t.mentions += 1;
+    }
     threadMap.set(m.container_number, t);
   }
   const threads = [...threadMap.entries()].sort(
     (a, b) => time(b[1].last.created_at) - time(a[1].last.created_at)
   );
   const threadUnread = threads.reduce((n, [, t]) => n + t.unread, 0);
+  const threadMentions = threads.reduce((n, [, t]) => n + t.mentions, 0);
+  const teamMentions = teamMessages.filter(
+    (m) => mentionsMe(m) && time(m.created_at) > time(teamLastRead)
+  ).length;
+  const mentionTotal = teamMentions + threadMentions;
   const totalUnread = unread + threadUnread;
   const statusFor = (number: string) => containers.find((c) => c.number === number)?.status ?? "";
+
+  // Who can be tagged: the group tags, then everyone else in the system.
+  const mentionOptions: MentionOption[] = [
+    ...GROUP_MENTIONS,
+    ...members
+      .filter((m) => m.id !== myId)
+      .map((m) => ({ token: m.id, label: m.full_name, hint: m.role })),
+  ];
+  const highlightNames = [
+    ...new Set([...GROUP_MENTIONS.map((o) => o.label), ...members.map((m) => m.full_name)]),
+  ].sort((a, b) => b.length - a.length);
+
+  const mentionMatch = /(^|\s)@([^\s@]*)$/.exec(draft);
+  const mentionMatches = mentionMatch
+    ? mentionOptions.filter((o) => normalize(o.label).includes(normalize(mentionMatch[2]))).slice(0, 6)
+    : [];
+  const activeMentionIndex = Math.min(mentionIndex, Math.max(mentionMatches.length - 1, 0));
+
+  function pickMention(option: MentionOption) {
+    setDraft((d) => d.replace(/@([^\s@]*)$/, `@${option.label} `));
+    setPickedMentions((prev) => (prev.some((p) => p.token === option.token) ? prev : [...prev, option]));
+    setMentionIndex(0);
+    textareaRef.current?.focus();
+  }
 
   function showTeam() {
     setTab("team");
     setUnread(0);
-    if (myId) void markRead(myId);
+    if (myId) void markRead(myId, teamMessages[teamMessages.length - 1]?.created_at);
   }
 
   function openThread(container: string) {
@@ -265,7 +366,7 @@ export function ChatWidget({
     setOpen(true);
     if (tab === "team") {
       setUnread(0);
-      if (myId) void markRead(myId);
+      if (myId) void markRead(myId, teamMessages[teamMessages.length - 1]?.created_at);
     } else if (activeContainer) {
       openThread(activeContainer);
     }
@@ -283,6 +384,12 @@ export function ChatWidget({
     // Which conversation this message belongs to: the open container
     // thread, or null for the general team room.
     const scope = tab === "containers" ? activeContainer : null;
+
+    // Only names actually picked from the list count as a tag, and only if
+    // the name is still in the text (it may have been edited out since).
+    const mentions = [
+      ...new Set(pickedMentions.filter((p) => text.includes(`@${p.label}`)).map((p) => p.token)),
+    ];
 
     setSending(true);
     setError(null);
@@ -314,6 +421,7 @@ export function ChatWidget({
         sender_role: userRole,
         body: text || null,
         container_number: scope,
+        mentions,
         ...attachment,
       })
       .select()
@@ -329,6 +437,7 @@ export function ChatWidget({
     const msg = inserted as ChatMessage;
     setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
     setDraft("");
+    setPickedMentions([]);
     setFile(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
@@ -353,10 +462,15 @@ export function ChatWidget({
             <div
               className={cn(
                 "max-w-[85%] rounded-2xl px-3 py-2 text-[13px]",
-                mine ? "bg-accent text-white" : "border border-border bg-surface text-text-primary"
+                mine ? "bg-accent text-white" : "border border-border bg-surface text-text-primary",
+                mentionsMe(m) && "ring-2 ring-warning/60"
               )}
             >
-              {m.body && <div className="whitespace-pre-wrap break-words">{m.body}</div>}
+              {m.body && (
+                <div className="whitespace-pre-wrap break-words">
+                  {renderBody(m.body, highlightNames, mine)}
+                </div>
+              )}
               <Attachment message={m} />
             </div>
             <div className="mt-0.5 px-1 text-[10px] text-text-tertiary">{formatTime(m.created_at)}</div>
@@ -369,6 +483,27 @@ export function ChatWidget({
 
   const composer = (
     <form onSubmit={handleSend} className="border-t border-border p-3">
+      {mentionMatches.length > 0 && (
+        <div className="mb-2 overflow-hidden rounded-lg border border-border bg-surface shadow-md">
+          {mentionMatches.map((o, i) => (
+            <button
+              key={o.token}
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                pickMention(o);
+              }}
+              className={cn(
+                "flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-[13px]",
+                i === activeMentionIndex ? "bg-accent-soft" : "hover:bg-page"
+              )}
+            >
+              <span className="font-medium text-text-primary">@{o.label}</span>
+              <span className="truncate text-[11px] text-text-tertiary">{o.hint}</span>
+            </button>
+          ))}
+        </div>
+      )}
       {file && (
         <div className="mb-2 flex items-center justify-between gap-2 rounded-lg bg-page px-2.5 py-1.5 text-[12px] text-text-secondary">
           <span className="flex min-w-0 items-center gap-1.5">
@@ -404,9 +539,30 @@ export function ChatWidget({
           <Paperclip className="h-4 w-4" />
         </button>
         <textarea
+          ref={textareaRef}
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            setMentionIndex(0);
+          }}
           onKeyDown={(e) => {
+            if (mentionMatches.length > 0) {
+              if (e.key === "ArrowDown") {
+                e.preventDefault();
+                setMentionIndex((activeMentionIndex + 1) % mentionMatches.length);
+                return;
+              }
+              if (e.key === "ArrowUp") {
+                e.preventDefault();
+                setMentionIndex((activeMentionIndex - 1 + mentionMatches.length) % mentionMatches.length);
+                return;
+              }
+              if (e.key === "Enter" || e.key === "Tab") {
+                e.preventDefault();
+                pickMention(mentionMatches[activeMentionIndex]);
+                return;
+              }
+            }
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
               void handleSend();
@@ -428,7 +584,12 @@ export function ChatWidget({
     </form>
   );
 
-  const tabButton = (id: "team" | "containers", label: string, count: number) => (
+  const tabButton = (
+    id: "team" | "containers",
+    label: string,
+    count: number,
+    mentions: number
+  ) => (
     <button
       type="button"
       onClick={() => (id === "team" ? showTeam() : setTab("containers"))}
@@ -440,6 +601,11 @@ export function ChatWidget({
       )}
     >
       {label}
+      {mentions > 0 && (
+        <span className="rounded-full bg-warning px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
+          @{mentions}
+        </span>
+      )}
       {count > 0 && (
         <span className="rounded-full bg-danger px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
           {count > 99 ? "99+" : count}
@@ -460,11 +626,21 @@ export function ChatWidget({
         )}
       >
         {open ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}
-        {totalUnread > 0 && !open && (
+        {(mentionTotal > 0 || totalUnread > 0) && !open && (
           <span className="absolute -right-1 -top-1 flex h-6 min-w-6 items-center justify-center">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-danger opacity-75" />
-            <span className="relative inline-flex h-6 min-w-6 animate-pulse items-center justify-center rounded-full bg-danger px-1.5 text-[11px] font-semibold text-white">
-              {totalUnread > 99 ? "99+" : totalUnread}
+            <span
+              className={cn(
+                "absolute inline-flex h-full w-full animate-ping rounded-full opacity-75",
+                mentionTotal > 0 ? "bg-warning" : "bg-danger"
+              )}
+            />
+            <span
+              className={cn(
+                "relative inline-flex h-6 min-w-6 animate-pulse items-center justify-center rounded-full px-1.5 text-[11px] font-semibold text-white",
+                mentionTotal > 0 ? "bg-warning" : "bg-danger"
+              )}
+            >
+              {mentionTotal > 0 ? `@${mentionTotal}` : totalUnread > 99 ? "99+" : totalUnread}
             </span>
           </span>
         )}
@@ -488,8 +664,8 @@ export function ChatWidget({
           </div>
 
           <div className="flex border-b border-border bg-surface">
-            {tabButton("team", "Team", unread)}
-            {tabButton("containers", "Containers", threadUnread)}
+            {tabButton("team", "Team", unread, teamMentions)}
+            {tabButton("containers", "Containers", threadUnread, threadMentions)}
           </div>
 
           {tab === "team" && (
@@ -560,11 +736,18 @@ export function ChatWidget({
                       {t.last.sender_name}: {t.last.body ?? "Attachment"}
                     </div>
                   </div>
-                  {t.unread > 0 && (
-                    <span className="mt-1 rounded-full bg-danger px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
-                      {t.unread}
-                    </span>
-                  )}
+                  <div className="mt-1 flex shrink-0 items-center gap-1">
+                    {t.mentions > 0 && (
+                      <span className="rounded-full bg-warning px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
+                        @{t.mentions}
+                      </span>
+                    )}
+                    {t.unread > 0 && (
+                      <span className="rounded-full bg-danger px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
+                        {t.unread}
+                      </span>
+                    )}
+                  </div>
                 </button>
               ))}
             </div>
