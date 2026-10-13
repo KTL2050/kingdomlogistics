@@ -40,11 +40,20 @@ export function ManualProgressForm({
   // "hasn't arrived yet" from "arrived, on time or not".
   const mombasaReached = Boolean(mombasaMilestone?.actualDate);
 
-  // The next stage still needing an update — the first one after Mombasa
-  // Port that isn't already marked completed. This is also the floor for
-  // what a manager can select: you can report being further ahead (the
-  // container clearly passed through here already), never further back.
-  const nextIndex = milestones.findIndex((m, i) => i > mombasaIndex && m.status !== "completed");
+  // The furthest inland stage already reported (it has a date), or -1 if
+  // none yet. A container is still IN that stage until it moves on, so it
+  // stays selectable for further updates — a new location or note while
+  // it's still en route — instead of being locked out once reported.
+  const lastReportedIndex = milestones.reduce(
+    (last, m, i) => (i > mombasaIndex && m.actualDate ? i : last),
+    -1
+  );
+  // What a manager can select starts here: the stage it's in now, or the
+  // first inland stage if nothing has been reported yet. Further ahead is
+  // allowed (it clearly passed through), further back never is.
+  const floorIndex = lastReportedIndex === -1 ? mombasaIndex + 1 : lastReportedIndex;
+  const firstUnreportedIndex = lastReportedIndex + 1 > mombasaIndex ? lastReportedIndex + 1 : mombasaIndex + 1;
+  const allDone = Boolean(milestones[steps.length - 1]?.actualDate);
 
   const [location, setLocation] = useState("");
   // null = no manual pick yet, so the detected guess (if any) applies.
@@ -59,11 +68,13 @@ export function ManualProgressForm({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  const detectedIndex = nextIndex === -1 ? null : detectStageIndex(location, steps, nextIndex);
-  // Clamped to nextIndex so a stale manual pick can never point at a
-  // stage that a previous submission (and the resulting refresh) has
-  // already completed.
-  const targetIndex = Math.max(overrideIndex ?? detectedIndex ?? nextIndex, nextIndex);
+  const detectedIndex = allDone ? null : detectStageIndex(location, steps, floorIndex);
+  // Clamped to floorIndex so a stale manual pick can never point further
+  // back than where the container already is.
+  const targetIndex = Math.max(overrideIndex ?? detectedIndex ?? floorIndex, floorIndex);
+  // Reporting the stage it's already in: a fresh location and note, not a
+  // new arrival, so the original date and lateness check stay untouched.
+  const isRepeat = targetIndex === lastReportedIndex;
   const autoDetected = overrideIndex === null && detectedIndex !== null;
 
   function handleLocationChange(value: string) {
@@ -88,7 +99,7 @@ export function ManualProgressForm({
   }
 
   // Every remaining stage is already marked complete.
-  if (nextIndex === -1) {
+  if (allDone) {
     return (
       <div className="rounded-xl border border-border bg-surface p-4">
         <div className="flex items-center gap-2">
@@ -125,9 +136,9 @@ export function ManualProgressForm({
     // this stage's planned date the same way the automatic Traqo sync
     // does, so a late manual update gets flagged exactly like a late
     // carrier-confirmed one would.
-    const actualIso = new Date(date).toISOString();
+    const actualIso = new Date(isRepeat ? new Date() : date).toISOString();
     const plannedIso = milestones[targetIndex].plannedDateIso;
-    const delayResult = checkDelay(plannedIso, actualIso);
+    const delayResult = isRepeat ? { isDelayed: false, daysLate: 0 } : checkDelay(plannedIso, actualIso);
     const wasAlreadyDelayed = milestones[targetIndex].status === "delayed";
 
     const isNewDelay = delayResult.isDelayed && !wasAlreadyDelayed;
@@ -154,7 +165,7 @@ export function ManualProgressForm({
       // one must have happened too — the container can't be at the store
       // without having passed through ICD — so it's backfilled as
       // completed rather than left stuck showing "Not reached" forever.
-      if (i > nextIndex - 1 && i < targetIndex && m.status !== "completed") {
+      if (i >= firstUnreportedIndex && i < targetIndex && m.status !== "completed") {
         return { ...m, status: "completed" as const, actualDate: m.actualDate ?? shortDate(date) };
       }
       if (i === targetIndex + 1 && m.status === "pending") {
@@ -166,7 +177,7 @@ export function ManualProgressForm({
     const { error: updateError } = await supabase
       .from("shipments")
       .update({
-        milestones: updated,
+        ...(isRepeat ? {} : { milestones: updated }),
         current_status: stageName,
         current_location: location.trim(),
         health: delayResult.isDelayed ? "delayed" : isFinalStage ? "completed" : undefined,
@@ -269,22 +280,28 @@ export function ManualProgressForm({
               onChange={(e) => setOverrideIndex(Number(e.target.value))}
               className="mt-1 w-full rounded-lg border border-border bg-page px-3 py-2 text-[13px] font-medium text-text-primary focus:border-accent focus:outline-none"
             >
-              {steps.slice(nextIndex).map((name, i) => (
-                <option key={name} value={nextIndex + i}>
-                  {name}
+              {steps.slice(floorIndex).map((name, i) => (
+                <option key={name} value={floorIndex + i}>
+                  {i === 0 && lastReportedIndex === floorIndex ? `${name} (already here — new update)` : name}
                 </option>
               ))}
             </select>
           </div>
-          <div>
-            <label className="text-[11px] text-text-tertiary">Date reached</label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="mt-1 rounded-lg border border-border px-3 py-2 text-[13px] focus:border-accent focus:outline-none"
-            />
-          </div>
+          {isRepeat ? (
+            <p className="pb-2 text-[11px] text-text-tertiary">
+              Reached this stage on {milestones[targetIndex].actualDate} — that date stays.
+            </p>
+          ) : (
+            <div>
+              <label className="text-[11px] text-text-tertiary">Date reached</label>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="mt-1 rounded-lg border border-border px-3 py-2 text-[13px] focus:border-accent focus:outline-none"
+              />
+            </div>
+          )}
         </div>
 
         <div>
