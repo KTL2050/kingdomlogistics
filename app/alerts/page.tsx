@@ -6,9 +6,10 @@ import { canManageStageDurations } from "@/lib/utils";
 export default async function AlertsPage() {
   const [allAlerts, user] = await Promise.all([getAlerts(), getCurrentUser()]);
   const canAddNote = Boolean(user && canManageStageDurations(user.role));
-  // Acknowledged alerts are resolved — this page is specifically for
-  // what still needs a decision, matching its own subtitle.
+  // Open alerts fill the three columns; acknowledged ones are resolved, so
+  // they move to the record section below instead of disappearing.
   const alerts = allAlerts.filter((a) => !a.acknowledged);
+  const acknowledged = allAlerts.filter((a) => a.acknowledged);
   const critical = alerts.filter((a) => a.severity === "critical");
   const warning = alerts.filter((a) => a.severity === "warning");
   const info = alerts.filter((a) => a.severity === "info");
@@ -71,6 +72,19 @@ export default async function AlertsPage() {
           )}
         </div>
       </div>
+
+      {acknowledged.length > 0 && (
+        <details className="mt-4 rounded-xl border border-border bg-surface">
+          <summary className="cursor-pointer select-none px-5 py-4 text-[15px] font-semibold text-text-primary">
+            Acknowledged <span className="text-text-tertiary">({acknowledged.length})</span>
+          </summary>
+          <div className="border-t border-border">
+            {acknowledged.map((a) => (
+              <AlertCard key={a.id} alert={a} canAddNote={canAddNote} currentUserName={user?.fullName} />
+            ))}
+          </div>
+        </details>
+      )}
     </AppShell>
   );
 }

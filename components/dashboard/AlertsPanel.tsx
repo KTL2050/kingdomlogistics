@@ -12,7 +12,9 @@ export function AlertsPanel({
   canAddNote?: boolean;
   currentUserName?: string;
 }) {
-  const visible = alerts.slice(0, 3);
+  // Acknowledged alerts are resolved — they stay on the Alerts page as a
+  // record, not in this box.
+  const visible = alerts.filter((a) => !a.acknowledged).slice(0, 3);
 
   return (
     <div className="flex h-full flex-col rounded-xl border border-border bg-surface">
@@ -29,6 +31,11 @@ export function AlertsPanel({
       </div>
 
       <div className="flex-1">
+        {visible.length === 0 && (
+          <p className="px-4 py-6 text-center text-[12.5px] text-text-tertiary">
+            No open alerts right now.
+          </p>
+        )}
         {visible.map((a) => (
           <AlertCard key={a.id} alert={a} canAddNote={canAddNote} currentUserName={currentUserName} />
         ))}

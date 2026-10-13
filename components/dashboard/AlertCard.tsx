@@ -28,6 +28,7 @@ export function AlertCard({
   const router = useRouter();
   const [detailOpen, setDetailOpen] = useState(false);
   const [acknowledging, setAcknowledging] = useState(false);
+  const [ackError, setAckError] = useState<string | null>(null);
   const [editingNote, setEditingNote] = useState(false);
   const [noteDraft, setNoteDraft] = useState(alert.managerNote ?? "");
   const [savingNote, setSavingNote] = useState(false);
@@ -37,7 +38,19 @@ export function AlertCard({
   async function handleAcknowledge() {
     if (!supabase) return;
     setAcknowledging(true);
-    await supabase.from("alerts").update({ acknowledged: true }).eq("id", alert.id);
+    setAckError(null);
+    const { data, error } = await supabase
+      .from("alerts")
+      .update({ acknowledged: true })
+      .eq("id", alert.id)
+      .select("id");
+    // A refusal by the database's access rules returns no error, just zero
+    // rows changed — so check for that too, or a failure looks like success.
+    if (error || !data || data.length === 0) {
+      setAcknowledging(false);
+      setAckError(error?.message ?? "Couldn't acknowledge this — you may not have permission.");
+      return;
+    }
     router.refresh();
   }
 
@@ -59,7 +72,12 @@ export function AlertCard({
   }
 
   return (
-    <div className="flex items-start gap-3 border-b border-border px-4 py-2.5 last:border-b-0">
+    <div
+      className={cn(
+        "flex items-start gap-3 border-b border-border px-4 py-2.5 last:border-b-0",
+        alert.acknowledged && "opacity-70"
+      )}
+    >
       <div
         className={cn(
           "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full",
@@ -148,16 +166,24 @@ export function AlertCard({
                 {alert.managerNote ? "Edit note" : "Add note"}
               </button>
             )}
-            <button
-              onClick={handleAcknowledge}
-              disabled={acknowledging}
-              className="flex shrink-0 items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] font-medium text-text-secondary hover:bg-page disabled:opacity-50"
-            >
-              <Check className="h-3 w-3" />
-              {acknowledging ? "…" : "Acknowledge"}
-            </button>
+            {alert.acknowledged ? (
+              <span className="flex shrink-0 items-center gap-1 rounded-md bg-page px-2 py-1 text-[11px] font-medium text-text-tertiary">
+                <Check className="h-3 w-3" />
+                Acknowledged
+              </span>
+            ) : (
+              <button
+                onClick={handleAcknowledge}
+                disabled={acknowledging}
+                className="flex shrink-0 items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] font-medium text-text-secondary hover:bg-page disabled:opacity-50"
+              >
+                <Check className="h-3 w-3" />
+                {acknowledging ? "…" : "Acknowledge"}
+              </button>
+            )}
           </div>
         </div>
+        {ackError && <p className="mt-1 text-[11px] text-danger">{ackError}</p>}
       </div>
 
       {detailOpen && <AlertDetailModal alert={alert} onClose={() => setDetailOpen(false)} />}
