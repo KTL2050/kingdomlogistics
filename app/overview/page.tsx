@@ -1,6 +1,7 @@
 import { Boxes, CheckCircle2, Clock, Hourglass } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { KpiCard } from "@/components/dashboard/KpiCard";
+import { CompletedKpiCard } from "@/components/dashboard/CompletedKpiCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { AlertsPanel } from "@/components/dashboard/AlertsPanel";
 import { getAlerts, getCurrentUser, getKpiSummary, getShipments } from "@/lib/data";
@@ -31,7 +32,7 @@ export default async function OverviewPage() {
       title="Overview"
       subtitle="A snapshot of shipment performance across your network"
     >
-      <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-1 sm:grid sm:grid-cols-2 sm:overflow-visible sm:pb-0 xl:grid-cols-4">
+      <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-1 sm:grid sm:grid-cols-2 sm:overflow-visible sm:pb-0 xl:grid-cols-5">
         <div className="min-w-0 shrink-0 basis-[calc(50%-8px)] snap-start sm:basis-auto">
           <KpiCard icon={Boxes} label="Total Containers" value={kpi.total} supporting="All shipments" tone="accent" />
         </div>
@@ -60,6 +61,12 @@ export default async function OverviewPage() {
             value={kpi.notStarted}
             supporting={`${((kpi.notStarted / kpi.total) * 100).toFixed(1)}% of total`}
             tone="warning"
+          />
+        </div>
+        <div className="min-w-0 shrink-0 basis-[calc(50%-8px)] snap-start sm:basis-auto">
+          <CompletedKpiCard
+            completed={shipments.filter((s) => s.health === "completed")}
+            total={kpi.total}
           />
         </div>
       </div>

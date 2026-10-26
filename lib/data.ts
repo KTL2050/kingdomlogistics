@@ -186,10 +186,12 @@ export async function getKpiSummary(): Promise<KpiSummary> {
   const all = await getShipments();
   return {
     total: all.length,
-    onTime: all.filter((s) => s.health === "on_time" || s.health === "completed")
-      .length,
+    // Completed containers have their own card, so they no longer count
+    // here as well — the five cards add up to the total.
+    onTime: all.filter((s) => s.health === "on_time").length,
     delayed: all.filter((s) => s.health === "delayed").length,
     notStarted: all.filter((s) => s.health === "not_started").length,
+    completed: all.filter((s) => s.health === "completed").length,
   };
 }
 

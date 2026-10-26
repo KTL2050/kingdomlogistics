@@ -41,6 +41,8 @@ export function MilestoneTimeline({
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const editingMilestone = shipment.milestones.find((m) => m.id === editingId);
+  const lastStage = shipment.milestones[shipment.milestones.length - 1];
+  const lateBy = lastStage?.status === "delayed" ? lastStage.daysLate ?? shipment.delayDays : 0;
 
   return (
     <div className="rounded-xl border border-border bg-surface p-4">
@@ -97,7 +99,13 @@ export function MilestoneTimeline({
           <div className="text-right">
             <StatusBadge health={shipment.health} delayDays={shipment.delayDays} />
             <div className="mt-1 text-[11px] text-text-tertiary">
-              {shipment.health === "delayed" ? "Behind schedule" : "On schedule"}
+              {shipment.health === "completed"
+                ? lateBy > 0
+                  ? `Delivered ${lateBy} day${lateBy === 1 ? "" : "s"} late`
+                  : "Delivered on time"
+                : shipment.health === "delayed"
+                ? "Behind schedule"
+                : "On schedule"}
             </div>
           </div>
         </div>

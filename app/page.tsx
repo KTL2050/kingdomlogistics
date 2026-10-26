@@ -1,6 +1,7 @@
 import { Boxes, CheckCircle2, Clock, Hourglass } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { KpiCard } from "@/components/dashboard/KpiCard";
+import { CompletedKpiCard } from "@/components/dashboard/CompletedKpiCard";
 import { RefreshActiveButton } from "@/components/dashboard/RefreshActiveButton";
 import { ShipmentStatusPanel } from "@/components/dashboard/ShipmentStatusPanel";
 import { AlertsPanel } from "@/components/dashboard/AlertsPanel";
@@ -26,7 +27,7 @@ export default async function ContainersPage() {
       subtitle="Real-time visibility of container shipments"
       headerAction={canRefresh ? <RefreshActiveButton /> : undefined}
     >
-      <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1 sm:grid sm:grid-cols-2 sm:overflow-visible sm:pb-0 xl:grid-cols-4">
+      <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1 sm:grid sm:grid-cols-2 sm:overflow-visible sm:pb-0 xl:grid-cols-5">
         <div className="min-w-0 shrink-0 basis-[calc(50%-6px)] snap-start sm:basis-auto">
           <KpiCard
             icon={Boxes}
@@ -61,6 +62,12 @@ export default async function ContainersPage() {
             value={kpi.notStarted}
             supporting={`${((kpi.notStarted / kpi.total) * 100).toFixed(1)}% of total`}
             tone="warning"
+          />
+        </div>
+        <div className="min-w-0 shrink-0 basis-[calc(50%-6px)] snap-start sm:basis-auto">
+          <CompletedKpiCard
+            completed={shipments.filter((s) => s.health === "completed")}
+            total={kpi.total}
           />
         </div>
       </div>

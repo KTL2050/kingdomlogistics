@@ -153,6 +153,7 @@ export function ManualProgressForm({
           ...m,
           status: delayResult.isDelayed ? ("delayed" as const) : ("completed" as const),
           actualDate: shortDate(date),
+          ...(delayResult.isDelayed ? { daysLate: delayResult.daysLate } : {}),
           // Stored on this specific milestone (not a shared shipment-level
           // field) so a later delay at a different stage can't silently
           // overwrite this one's reason.
@@ -180,7 +181,9 @@ export function ManualProgressForm({
         ...(isRepeat ? {} : { milestones: updated }),
         current_status: stageName,
         current_location: location.trim(),
-        health: delayResult.isDelayed ? "delayed" : isFinalStage ? "completed" : undefined,
+        // Reaching the final stage completes the container even if it got
+        // there late — the lateness stays visible on its stages.
+        health: isFinalStage ? "completed" : delayResult.isDelayed ? "delayed" : undefined,
         ...(isNewDelay && {
           delay_days: delayResult.daysLate,
           delay_reason: delayReason,

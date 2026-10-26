@@ -27,7 +27,11 @@ const EVENT_TO_STEP: Record<string, string> = {
 // FIRST matching event is what actually corresponds to it — a second
 // loading/departure at a transshipment hub isn't a new milestone in our
 // simplified route, it's the same leg continuing.
-const EARLIEST_WINS = new Set(["Container Loaded", "On the High Seas"]);
+// Mombasa Port is earliest-wins too: it maps arrival, discharge AND
+// gate-out events, and the stage's date is when the container ARRIVED —
+// taking the latest (the gate-out, which can be days or weeks later after
+// customs and taxes) made on-time arrivals look late.
+const EARLIEST_WINS = new Set(["Container Loaded", "On the High Seas", "Mombasa Port"]);
 
 function shortDate(iso: string) {
   const d = new Date(iso.replace(" ", "T"));

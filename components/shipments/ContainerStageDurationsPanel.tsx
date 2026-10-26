@@ -138,7 +138,12 @@ export function ContainerStageDurationsPanel({
       reevaluateMilestones(withNewPlan, etd);
 
     const shipmentUpdate: Record<string, unknown> = { milestones: updatedMilestones };
-    if (hasDelay) {
+    const delivered = Boolean(updatedMilestones[updatedMilestones.length - 1]?.actualDate);
+    if (delivered) {
+      // Delivered containers stay Completed; late stages keep their flags.
+      shipmentUpdate.health = "completed";
+      shipmentUpdate.delay_days = hasDelay ? maxDaysLate : 0;
+    } else if (hasDelay) {
       shipmentUpdate.health = "delayed";
       shipmentUpdate.delay_days = maxDaysLate;
     } else if (hadDelay) {

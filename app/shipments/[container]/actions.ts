@@ -192,6 +192,11 @@ async function syncShipmentTracking({
           )
         : milestones;
 
+    // A container that has already reached the store is finished: tracking
+    // only covers the ocean leg, so a refresh must not drag it back to an
+    // earlier stage or flip it from Completed back to delayed.
+    const delivered = Boolean(existingMilestones[existingMilestones.length - 1]?.actualDate);
+
     const { error } = await supabase
       .from("shipments")
       .update({
@@ -200,9 +205,9 @@ async function syncShipmentTracking({
         shipping_line: result.data.sealine_name || undefined,
         milestones: milestonesWithReason,
         waypoints,
-        current_status: currentStatus,
-        current_location: currentLocation || undefined,
-        health,
+        current_status: delivered ? steps[steps.length - 1] : currentStatus,
+        current_location: delivered ? undefined : currentLocation || undefined,
+        health: delivered ? "completed" : health,
         position,
         eta: realEta,
         final_eta: realEta,

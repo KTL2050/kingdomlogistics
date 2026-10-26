@@ -118,6 +118,7 @@ export interface KpiSummary {
   onTime: number;
   delayed: number;
   notStarted: number;
+  completed: number;
 }
 
 export type OrderFrequency = "monthly" | "quarterly" | "yearly" | "custom";
