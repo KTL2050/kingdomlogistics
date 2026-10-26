@@ -221,10 +221,15 @@ function RecenterControl({ points }: { points: [number, number][] }) {
 }
 
 export default function TrackingMapInner({
-  shipments,
+  shipments: allShipments,
 }: {
   shipments: Shipment[];
 }) {
+  // A completed container has finished its journey, so it's left off the
+  // map entirely — its route line, name tag, position dot, stop markers
+  // and legend entry. The shared Shekou/Mombasa/ICD/store pins stay.
+  const shipments = allShipments.filter((s) => s.health !== "completed");
+
   const trunkPoints: [number, number][] = useMemo(
     () => [
       [ORIGIN.lat, ORIGIN.lng],

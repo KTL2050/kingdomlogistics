@@ -91,6 +91,17 @@ async function syncShipmentTracking({
   if (!supabase) return { error: "Supabase isn't configured." };
 
   try {
+    // A container already marked Completed is finished — refuse here too,
+    // so a stale page or another route can't re-open its tracking.
+    const { data: current } = await supabase
+      .from("shipments")
+      .select("health")
+      .eq("id", shipmentId)
+      .single();
+    if (current?.health === "completed") {
+      return { error: "This container is complete — tracking is closed." };
+    }
+
     const result =
       referenceType === "container"
         ? await trackByContainer(reference)

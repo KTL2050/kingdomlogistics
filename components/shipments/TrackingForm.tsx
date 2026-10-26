@@ -10,12 +10,14 @@ export function TrackingForm({
   currentReference,
   currentReferenceType,
   lastSyncedAt,
+  completed = false,
 }: {
   shipmentId: string;
   containerNumber: string;
   currentReference?: string | null;
   currentReferenceType?: "container" | "bl" | null;
   lastSyncedAt?: string | null;
+  completed?: boolean;
 }) {
   const [reference, setReference] = useState(currentReference ?? "");
   const [referenceType, setReferenceType] = useState<"container" | "bl">(
@@ -48,6 +50,28 @@ export function TrackingForm({
       return;
     }
     setSuccess(true);
+  }
+
+  // A delivered container is finished — there's nothing left to track, so
+  // the form (and its Refresh button) is replaced by a note.
+  if (completed) {
+    return (
+      <div className="rounded-xl border border-border bg-surface p-4">
+        <div className="flex items-center gap-2">
+          <Satellite className="h-4 w-4 text-text-tertiary" />
+          <h2 className="text-[14px] font-semibold text-text-primary">Carrier tracking</h2>
+        </div>
+        <p className="mt-1 text-[12px] text-text-secondary">
+          Delivered — tracking is closed for this container.
+          {currentReference && <> Tracked as {currentReference}.</>}
+        </p>
+        {lastSyncedAt && (
+          <p className="mt-2 text-[11px] text-text-tertiary">
+            Last synced: {new Date(lastSyncedAt).toLocaleString("en-GB")}
+          </p>
+        )}
+      </div>
+    );
   }
 
   return (

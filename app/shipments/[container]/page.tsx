@@ -72,6 +72,7 @@ export default async function ShipmentDetailPage({
           currentReference={shipment.trackingReference}
           currentReferenceType={shipment.trackingReferenceType}
           lastSyncedAt={shipment.trackingLastSyncedAt}
+          completed={shipment.health === "completed"}
         />
       </div>
 
