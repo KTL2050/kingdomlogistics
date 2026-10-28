@@ -621,3 +621,89 @@ as $$
     and exists (select 1 from users me where me.id = auth.uid() and me.status = 'approved')
   order by u.full_name;
 $$;
+
+-- ---------------------------------------------------------------------
+-- Agent read access (Morning Shipment Briefing)
+-- ---------------------------------------------------------------------
+-- One read-only door for the briefing agent: agent_briefing_data(key)
+-- returns the active containers, open alerts and stage durations as one
+-- JSON object. The caller proves itself with a key; only the key's
+-- SHA-256 hash is stored here, never the key itself. The function is
+-- stable, so Postgres refuses any insert, update or delete inside it.
+-- Revoke an agent by deleting its row in agent_keys.
+
+create extension if not exists pgcrypto with schema extensions;
+
+create table if not exists agent_keys (
+  name text primary key,
+  key_hash text not null unique,  -- hex SHA-256 of the key
+  created_at timestamptz not null default now()
+);
+
+alter table agent_keys enable row level security;
+-- No policies: nobody reads or writes this table through the API.
+revoke all on agent_keys from anon, authenticated;
+
+create or replace function agent_briefing_data(p_key text)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if p_key is null or not exists (
+    select 1 from agent_keys
+    where key_hash = encode(extensions.digest(p_key, 'sha256'), 'hex')
+  ) then
+    raise exception 'Not allowed' using errcode = '42501';
+  end if;
+
+  -- Columns are picked by name from each row rather than selected
+  -- directly, so a column the live table lacks is left out instead of
+  -- breaking the function, and new columns never leak in.
+  return jsonb_build_object(
+    'generated_at', now(),
+    'shipments', coalesce((
+      select jsonb_agg((
+        select jsonb_object_agg(e.key, e.value)
+        from jsonb_each(to_jsonb(s)) e
+        where e.key = any (array[
+          'id', 'shipment_number', 'container_number', 'customer',
+          'origin', 'destination', 'shipping_line', 'mode', 'container_size',
+          'etd', 'eta', 'final_eta', 'current_status', 'current_location',
+          'health', 'delay_days', 'delay_reason', 'delay_reported_at',
+          'milestones', 'tracking_last_synced_at', 'created_at', 'updated_at'
+        ])
+      ) order by s.shipment_number)
+      from shipments s
+      where s.health in ('on_time', 'delayed')
+         or (s.health = 'completed' and s.updated_at >= now() - interval '2 days')
+    ), '[]'::jsonb),
+    'alerts', coalesce((
+      select jsonb_agg((
+        select jsonb_object_agg(e.key, e.value)
+        from jsonb_each(to_jsonb(a)) e
+        where e.key = any (array[
+          'id', 'shipment_number', 'severity', 'title', 'description',
+          'admin_only', 'expected_next_stage', 'expected_next_date', 'created_at'
+        ])
+      ) order by a.created_at)
+      from alerts a
+      where a.acknowledged = false
+    ), '[]'::jsonb),
+    'stage_durations', coalesce((
+      select jsonb_agg(to_jsonb(d)) from stage_durations d
+    ), '[]'::jsonb),
+    'container_stage_durations', coalesce((
+      select jsonb_agg(to_jsonb(c)) from container_stage_durations c
+    ), '[]'::jsonb)
+  );
+end;
+$$;
+
+-- Supabase grants new functions to anon and authenticated by default;
+-- take that back, then let only the anon key call it (the key check
+-- above is the real gate).
+revoke all on function agent_briefing_data(text) from public, anon, authenticated;
+grant execute on function agent_briefing_data(text) to anon;
