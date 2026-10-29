@@ -626,8 +626,8 @@ $$;
 -- Agent read access (Morning Shipment Briefing)
 -- ---------------------------------------------------------------------
 -- One read-only door for the briefing agent: agent_briefing_data(key)
--- returns the active containers, open alerts and stage durations as one
--- JSON object. The caller proves itself with a key; only the key's
+-- returns the active containers and open alerts, only the fields the
+-- briefing uses, as one JSON object. The caller proves itself with a key; only the key's
 -- SHA-256 hash is stored here, never the key itself. The function is
 -- stable, so Postgres refuses any insert, update or delete inside it.
 -- Revoke an agent by deleting its row in agent_keys.
@@ -669,11 +669,11 @@ begin
         select jsonb_object_agg(e.key, e.value)
         from jsonb_each(to_jsonb(s)) e
         where e.key = any (array[
-          'id', 'shipment_number', 'container_number', 'customer',
-          'origin', 'destination', 'shipping_line', 'mode', 'container_size',
-          'etd', 'eta', 'final_eta', 'current_status', 'current_location',
-          'health', 'delay_days', 'delay_reason', 'delay_reported_at',
-          'milestones', 'tracking_last_synced_at', 'created_at', 'updated_at'
+          'container_number', 'customer', 'current_status', 'health',
+          'etd', 'eta', 'final_eta', 'delay_days', 'milestones',
+          'tracking_last_synced_at', 'updated_at',
+          'origin', 'destination', 'shipping_line', 'container_size', 'mode',
+          'current_location', 'delay_reason'
         ])
       ) order by s.shipment_number)
       from shipments s
@@ -685,18 +685,11 @@ begin
         select jsonb_object_agg(e.key, e.value)
         from jsonb_each(to_jsonb(a)) e
         where e.key = any (array[
-          'id', 'shipment_number', 'severity', 'title', 'description',
-          'admin_only', 'expected_next_stage', 'expected_next_date', 'created_at'
+          'shipment_number', 'title', 'created_at', 'severity', 'description'
         ])
       ) order by a.created_at)
       from alerts a
       where a.acknowledged = false
-    ), '[]'::jsonb),
-    'stage_durations', coalesce((
-      select jsonb_agg(to_jsonb(d)) from stage_durations d
-    ), '[]'::jsonb),
-    'container_stage_durations', coalesce((
-      select jsonb_agg(to_jsonb(c)) from container_stage_durations c
     ), '[]'::jsonb)
   );
 end;
