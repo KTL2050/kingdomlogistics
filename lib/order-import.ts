@@ -1,5 +1,5 @@
 import { getCompanyForContainer } from "@/lib/utils";
-import type { ContainerSize, OrderFrequency, PlannedOrder } from "@/types";
+import type { ContainerSize, Country, OrderFrequency, PlannedOrder } from "@/types";
 
 /**
  * Every header wording this parser recognizes for each field, already
@@ -178,7 +178,8 @@ export interface ImportRowResult {
  * history for the same container.
  */
 export function buildPlannedOrdersFromRows(
-  rows: { rowNumber: number; values: Record<string, unknown>; rawCells?: unknown[] }[]
+  rows: { rowNumber: number; values: Record<string, unknown>; rawCells?: unknown[] }[],
+  country: Country = "Uganda"
 ): ImportRowResult[] {
   return rows.map(({ rowNumber, values, rawCells = [] }) => {
     let container = cleanCell(values.container).toUpperCase();
@@ -192,11 +193,11 @@ export function buildPlannedOrdersFromRows(
       return { rowNumber, error: "No container code found in this row" };
     }
 
-    const company = getCompanyForContainer(container);
+    const company = getCompanyForContainer(container, country);
     if (company === "Unknown") {
       return {
         rowNumber,
-        error: `Container "${container}" doesn't start with C (Uncle Bills) or A (Aiwibi Uganda)`,
+        error: `Container "${container}" doesn't start with C (Uncle Bills) or A (Aiwibi ${country})`,
       };
     }
 
@@ -220,6 +221,7 @@ export function buildPlannedOrdersFromRows(
 
     const order: PlannedOrder = {
       id: `po-import-${rowNumber}-${Date.now()}`,
+      country,
       company,
       frequency,
       customIntervalDays: frequency === "custom" ? customIntervalDays : undefined,

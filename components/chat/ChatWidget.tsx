@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, FileText, MessageCircle, Paperclip, Send, X } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import type { Country } from "@/types";
 
 interface ChatMessage {
   id: string;
@@ -16,6 +17,7 @@ interface ChatMessage {
   attachment_type: string | null;
   // null = the general team room; set = that container's conversation.
   container_number: string | null;
+  country: Country;
   // Who this message tags: user ids, "everyone", or "role:<Role name>".
   mentions: string[];
   created_at: string;
@@ -136,10 +138,13 @@ export function ChatWidget({
   userName,
   userRole,
   containers,
+  country,
 }: {
   userName: string;
   userRole: string;
   containers: ChatContainer[];
+  /** Each country has its own room, threads and read markers. */
+  country: Country;
 }) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -180,16 +185,21 @@ export function ChatWidget({
     if (!supabase) return;
     const at = upTo ?? new Date().toISOString();
     setTeamLastRead(at);
-    await supabase.from("chat_reads").upsert({ user_id: userId, last_read_at: at });
-  }, []);
+    await supabase
+      .from("chat_reads")
+      .upsert({ user_id: userId, country, last_read_at: at }, { onConflict: "user_id,country" });
+  }, [country]);
 
   const markThreadRead = useCallback(async (userId: string, container: string, upTo: string) => {
     if (!supabase) return;
     setThreadReads((prev) => ({ ...prev, [container]: upTo }));
     await supabase
       .from("chat_thread_reads")
-      .upsert({ user_id: userId, container_number: container, last_read_at: upTo });
-  }, []);
+      .upsert(
+        { user_id: userId, country, container_number: container, last_read_at: upTo },
+        { onConflict: "user_id,country,container_number" }
+      );
+  }, [country]);
 
   useEffect(() => {
     if (!supabase) return;
@@ -209,17 +219,28 @@ export function ChatWidget({
           client
             .from("chat_messages")
             .select("*")
+            .eq("country", country)
             .is("container_number", null)
             .order("created_at", { ascending: false })
             .limit(100),
           client
             .from("chat_messages")
             .select("*")
+            .eq("country", country)
             .not("container_number", "is", null)
             .order("created_at", { ascending: false })
             .limit(300),
-          client.from("chat_reads").select("last_read_at").eq("user_id", uid).maybeSingle(),
-          client.from("chat_thread_reads").select("container_number, last_read_at").eq("user_id", uid),
+          client
+            .from("chat_reads")
+            .select("last_read_at")
+            .eq("user_id", uid)
+            .eq("country", country)
+            .maybeSingle(),
+          client
+            .from("chat_thread_reads")
+            .select("container_number, last_read_at")
+            .eq("user_id", uid)
+            .eq("country", country),
         ]);
       if (cancelled) return;
       setMessages([
@@ -235,7 +256,7 @@ export function ChatWidget({
       // The people list for the @ autocomplete. If the chat_members
       // function isn't in the database yet this just comes back empty and
       // only Everyone and the role tags are offered.
-      const { data: memberRows } = await client.rpc("chat_members");
+      const { data: memberRows } = await client.rpc("chat_members", { p_country: country });
       if (cancelled) return;
       setMembers((memberRows ?? []) as Member[]);
 
@@ -246,6 +267,7 @@ export function ChatWidget({
           .from("chat_messages")
           .select("id", { count: "exact", head: true })
           .gt("created_at", lastRead)
+          .eq("country", country)
           .is("container_number", null)
           .neq("user_id", uid);
         if (!cancelled) setUnread(count ?? 0);
@@ -263,6 +285,8 @@ export function ChatWidget({
           { event: "INSERT", schema: "public", table: "chat_messages" },
           (payload) => {
             const msg = payload.new as ChatMessage;
+            // Another country's message: not for this room, not counted.
+            if (msg.country !== country) return;
             setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
             if (msg.user_id === myIdRef.current) return;
             const view = viewRef.current;
@@ -287,7 +311,7 @@ export function ChatWidget({
       cancelled = true;
       if (channel) client.removeChannel(channel);
     };
-  }, [markRead, markThreadRead]);
+  }, [markRead, markThreadRead, country]);
 
   useEffect(() => {
     if (open) bottomRef.current?.scrollIntoView({ block: "end" });
@@ -421,6 +445,7 @@ export function ChatWidget({
         sender_role: userRole,
         body: text || null,
         container_number: scope,
+        country,
         mentions,
         ...attachment,
       })

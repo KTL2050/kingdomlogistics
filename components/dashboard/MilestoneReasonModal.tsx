@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
-import type { Milestone } from "@/types";
+import type { Country, Milestone } from "@/types";
 
 function shortDate(iso: string) {
   const d = new Date(iso);
@@ -21,6 +21,7 @@ function shortDate(iso: string) {
 export function MilestoneReasonModal({
   shipmentId,
   containerNumber,
+  country,
   milestones,
   milestone,
   currentUserName,
@@ -28,6 +29,7 @@ export function MilestoneReasonModal({
 }: {
   shipmentId: string;
   containerNumber: string;
+  country: Country;
   milestones: Milestone[];
   milestone: Milestone;
   currentUserName?: string;
@@ -67,6 +69,7 @@ export function MilestoneReasonModal({
     // progress update — a retroactive reason is still news to the team.
     const { error: alertError } = await supabase.from("alerts").insert({
       severity: "warning",
+      country,
       shipment_number: containerNumber,
       title: milestone.name,
       description: `Reason recorded for ${milestone.name}.`,

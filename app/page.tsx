@@ -7,15 +7,16 @@ import { ShipmentStatusPanel } from "@/components/dashboard/ShipmentStatusPanel"
 import { AlertsPanel } from "@/components/dashboard/AlertsPanel";
 import { TrackingMap } from "@/components/dashboard/TrackingMap";
 import { ContainerMilestoneSection } from "@/components/dashboard/ContainerMilestoneSection";
-import { getAlerts, getCurrentUser, getKpiSummary, getShipments } from "@/lib/data";
+import { getActiveCountry, getAlerts, getCurrentUser, getKpiSummary, getShipments } from "@/lib/data";
 import { canManageStageDurations } from "@/lib/utils";
 
 export default async function ContainersPage() {
-  const [shipments, alerts, kpi, user] = await Promise.all([
+  const [shipments, alerts, kpi, user, { country }] = await Promise.all([
     getShipments(),
     getAlerts(),
     getKpiSummary(),
     getCurrentUser(),
+    getActiveCountry(),
   ]);
   const canAddNote = Boolean(user && canManageStageDurations(user.role));
   const canRefresh = Boolean(user && user.role !== "Viewer");
@@ -74,7 +75,7 @@ export default async function ContainersPage() {
 
       <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-[65%_1fr]">
         <div className="h-[360px] overflow-hidden rounded-xl border border-border bg-surface">
-          <TrackingMap shipments={shipments} />
+          <TrackingMap shipments={shipments} country={country} />
         </div>
         <div className="h-[360px]">
           <ShipmentStatusPanel shipments={shipments} />

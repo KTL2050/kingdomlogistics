@@ -6,7 +6,7 @@ import { CheckCircle2, RotateCcw } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { computePlannedDates } from "@/lib/planning";
 import { reevaluateMilestones } from "@/lib/milestone-eval";
-import type { Milestone } from "@/types";
+import type { Country, Milestone } from "@/types";
 
 interface Row {
   stepName: string;
@@ -17,12 +17,14 @@ interface Row {
 export function ContainerStageDurationsPanel({
   shipmentId,
   containerNumber,
+  country,
   steps,
   etd,
   milestones,
 }: {
   shipmentId: string;
   containerNumber: string;
+  country: Country;
   steps: readonly string[];
   etd: string;
   milestones: Milestone[];
@@ -39,11 +41,12 @@ export function ContainerStageDurationsPanel({
       if (!supabase) return;
       setLoading(true);
       const [{ data: defaults }, { data: overrides }] = await Promise.all([
-        supabase.from("stage_durations").select("*"),
+        supabase.from("stage_durations").select("*").eq("country", country),
         supabase
           .from("container_stage_durations")
           .select("*")
-          .eq("container_number", containerNumber),
+          .eq("container_number", containerNumber)
+          .eq("country", country),
       ]);
 
       const defaultByStep = new Map(
@@ -63,7 +66,7 @@ export function ContainerStageDurationsPanel({
       setLoading(false);
     }
     load();
-  }, [containerNumber, steps]);
+  }, [containerNumber, country, steps]);
 
   function updateOverride(stepName: string, value: string) {
     setSaved(false);
@@ -89,10 +92,11 @@ export function ContainerStageDurationsPanel({
       const { error: upsertError } = await supabase.from("container_stage_durations").upsert(
         toUpsert.map((r) => ({
           container_number: containerNumber,
+          country,
           step_name: r.stepName,
           expected_days: r.overrideDays,
         })),
-        { onConflict: "container_number,step_name" }
+        { onConflict: "container_number,country,step_name" }
       );
       if (upsertError) {
         setSaving(false);
@@ -106,6 +110,7 @@ export function ContainerStageDurationsPanel({
         .from("container_stage_durations")
         .delete()
         .eq("container_number", containerNumber)
+        .eq("country", country)
         .in(
           "step_name",
           toClear.map((r) => r.stepName)

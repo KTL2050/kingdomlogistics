@@ -1,5 +1,6 @@
 // Server-only client for traqocontainer.com's tracking API. Never import
-// this from a client component — TRAQO_API_KEY must stay server-side.
+// this from a client component — the Traqo keys must stay server-side.
+import type { Country } from "@/types";
 
 export interface TraqoEvent {
   idx: number;
@@ -51,23 +52,26 @@ export class TraqoError extends Error {
   }
 }
 
-const TRAQO_API_KEY = process.env.TRAQO_API_KEY;
-
 /**
- * True once a real key is set. Until then, every call below quietly
- * runs against Traqo's public sandbox instead — no key needed, and the
- * response shape is documented as identical, so nothing else in this
- * module needs to change when you add the real key later.
+ * Each country can have its own Traqo account. Kenya uses its own key
+ * (TRAQO_API_KEY_KENYA) once it's set, and until then falls back to the
+ * Uganda key — so Kenya containers use up the Uganda plan's shipment slots
+ * until Kenya's own key is added. With no key at all, calls run against
+ * Traqo's public sandbox instead (demo data, no key needed, same response
+ * shape), as before.
  */
-export const isTraqoLive = Boolean(TRAQO_API_KEY);
+function keyFor(country: Country): string | undefined {
+  if (country === "Kenya") return process.env.TRAQO_API_KEY_KENYA || process.env.TRAQO_API_KEY;
+  return process.env.TRAQO_API_KEY;
+}
 
-const BASE_URL = isTraqoLive
-  ? "https://traqocontainer.com/api/v1"
-  : "https://traqocontainer.com/api/v1/sandbox";
-
-async function traqoFetch(path: string): Promise<TraqoResponse> {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    headers: isTraqoLive ? { Authorization: `Bearer ${TRAQO_API_KEY}` } : {},
+async function traqoFetch(path: string, country: Country): Promise<TraqoResponse> {
+  const key = keyFor(country);
+  const base = key
+    ? "https://traqocontainer.com/api/v1"
+    : "https://traqocontainer.com/api/v1/sandbox";
+  const res = await fetch(`${base}${path}`, {
+    headers: key ? { Authorization: `Bearer ${key}` } : {},
     cache: "no-store",
   });
 
@@ -111,10 +115,10 @@ async function traqoFetch(path: string): Promise<TraqoResponse> {
  * slot, so this same function covers both "start tracking" and
  * "refresh" for now.
  */
-export function trackByContainer(containerNumber: string): Promise<TraqoResponse> {
-  return traqoFetch(`/container/${encodeURIComponent(containerNumber)}`);
+export function trackByContainer(containerNumber: string, country: Country): Promise<TraqoResponse> {
+  return traqoFetch(`/container/${encodeURIComponent(containerNumber)}`, country);
 }
 
-export function trackByBillOfLading(blNumber: string): Promise<TraqoResponse> {
-  return traqoFetch(`/bl/${encodeURIComponent(blNumber)}`);
+export function trackByBillOfLading(blNumber: string, country: Country): Promise<TraqoResponse> {
+  return traqoFetch(`/bl/${encodeURIComponent(blNumber)}`, country);
 }

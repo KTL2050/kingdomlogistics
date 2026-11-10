@@ -6,6 +6,7 @@ import { PackageCheck, X } from "lucide-react";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { actualDateToIso } from "@/lib/milestone-eval";
 import { getCompanyForContainer } from "@/lib/utils";
+import { shipmentHref } from "@/lib/country";
 import type { Shipment } from "@/types";
 
 // The store-arrival date is saved without a year ("24 Oct"), so the year is
@@ -76,14 +77,14 @@ export function CompletedKpiCard({ completed, total }: { completed: Shipment[]; 
               {rows.map(({ s, iso, lateBy }) => (
                 <Link
                   key={s.id}
-                  href={`/shipments/${s.containerNumber}`}
+                  href={shipmentHref(s)}
                   onClick={() => setOpen(false)}
                   className="flex items-center justify-between gap-3 border-b border-border px-5 py-3 last:border-b-0 hover:bg-page"
                 >
                   <div>
                     <div className="text-[13px] font-semibold text-text-primary">{s.containerNumber}</div>
                     <div className="text-[11px] text-text-tertiary">
-                      {getCompanyForContainer(s.containerNumber)}
+                      {getCompanyForContainer(s.containerNumber, s.country)}
                     </div>
                   </div>
                   <div className="text-right">

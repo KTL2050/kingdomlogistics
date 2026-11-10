@@ -2,18 +2,20 @@
 
 import { useState } from "react";
 import { FileSpreadsheet, FileText } from "lucide-react";
-import type { Shipment, KpiSummary } from "@/types";
+import type { Country, Shipment, KpiSummary } from "@/types";
 
 export function ExportButtons({
   shipments,
   kpi,
   avgDelay,
   avgTransit,
+  country,
 }: {
   shipments: Shipment[];
   kpi: KpiSummary;
   avgDelay: number;
   avgTransit: number;
+  country: Country;
 }) {
   const [exportingPdf, setExportingPdf] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +59,7 @@ export function ExportButtons({
         { header: "Value", key: "value", width: 14 },
       ];
       summarySheet.addRows([
+        { metric: "Country", value: country },
         { metric: "Total Shipments", value: kpi.total },
         {
           metric: "On-Time Rate (%)",
@@ -132,7 +135,7 @@ export function ExportButtons({
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `shipment-report-${dateLabel}.xlsx`;
+      a.download = `shipment-report-${country.toLowerCase()}-${dateLabel}.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
     } catch {
@@ -166,7 +169,7 @@ export function ExportButtons({
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
       pdf.setFontSize(13);
-      pdf.text("Shipment Report", margin, margin);
+      pdf.text(`Shipment Report — ${country}`, margin, margin);
       pdf.setFontSize(8);
       pdf.setTextColor(120);
       pdf.text(
@@ -193,7 +196,7 @@ export function ExportButtons({
       }
 
       const dateLabel = new Date().toISOString().slice(0, 10);
-      pdf.save(`shipment-report-${dateLabel}.pdf`);
+      pdf.save(`shipment-report-${country.toLowerCase()}-${dateLabel}.pdf`);
     } catch {
       setError("Couldn't build the PDF — try again.");
     } finally {

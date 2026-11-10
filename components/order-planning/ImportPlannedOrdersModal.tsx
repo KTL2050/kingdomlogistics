@@ -6,7 +6,7 @@ import { FileWarning, Upload, X } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase/client";
 import { buildPlannedOrdersFromRows, normalizeHeader, type ImportRowResult } from "@/lib/order-import";
 import { extractGridFromPdf } from "@/lib/pdf-text";
-import type { PlannedOrder } from "@/types";
+import type { Country, PlannedOrder } from "@/types";
 
 /** A minimal CSV line splitter that still handles quoted commas — good
  * enough for a spreadsheet export, without pulling in a new dependency. */
@@ -68,8 +68,10 @@ function rowsFromGrid(
 
 export function ImportPlannedOrdersModal({
   onImport,
+  country,
 }: {
   onImport: (orders: PlannedOrder[]) => void;
+  country: Country;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -133,7 +135,7 @@ export function ImportPlannedOrdersModal({
         return;
       }
 
-      setResults(buildPlannedOrdersFromRows(rows));
+      setResults(buildPlannedOrdersFromRows(rows, country));
     } catch {
       setError("Couldn't read that file — make sure it's a valid .xlsx, .csv, or .pdf.");
     }
@@ -160,6 +162,7 @@ export function ImportPlannedOrdersModal({
         .from("planned_orders")
         .insert(
           validOrders.map(({ order }) => ({
+            country,
             company: order.company,
             frequency: order.frequency,
             custom_interval_days: order.customIntervalDays ?? null,

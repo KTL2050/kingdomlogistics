@@ -3,7 +3,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { ProfileForm } from "@/components/settings/ProfileForm";
 import { TeamPanel } from "@/components/settings/TeamPanel";
 import { StageDurationsPanel } from "@/components/settings/StageDurationsPanel";
-import { getCurrentUser } from "@/lib/data";
+import { getActiveCountry, getCurrentUser } from "@/lib/data";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 import { canManageStageDurations } from "@/lib/utils";
 import { CheckCircle2, XCircle } from "lucide-react";
@@ -13,6 +13,7 @@ export default async function SettingsPage() {
   if (!user) redirect("/login");
   const isAdmin = user.role === "Admin" && user.status === "approved";
   const canManageDurations = user.status === "approved" && canManageStageDurations(user.role);
+  const { country } = await getActiveCountry();
 
   return (
     <AppShell
@@ -47,7 +48,7 @@ export default async function SettingsPage() {
 
       {canManageDurations && (
         <div className="mt-4">
-          <StageDurationsPanel />
+          <StageDurationsPanel key={country} country={country} />
         </div>
       )}
 

@@ -11,15 +11,22 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { CompanyBadge } from "@/components/ui/CompanyBadge";
 import { getShipmentByContainer, getCurrentUser } from "@/lib/data";
 import { getRouteStepsForContainer } from "@/lib/mock-data";
+import { parseCountry } from "@/lib/country";
 import { canManageStageDurations, canSendInlandUpdates } from "@/lib/utils";
 
 export default async function ShipmentDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ container: string }>;
+  searchParams: Promise<{ country?: string }>;
 }) {
   const { container } = await params;
-  const [shipment, user] = await Promise.all([getShipmentByContainer(container), getCurrentUser()]);
+  const { country: requested } = await searchParams;
+  const [shipment, user] = await Promise.all([
+    getShipmentByContainer(container, parseCountry(requested) ?? undefined),
+    getCurrentUser(),
+  ]);
 
   if (!shipment) notFound();
   if (!user) redirect("/login");
@@ -47,7 +54,7 @@ export default async function ShipmentDetailPage({
       <div className="mb-4 grid grid-cols-2 gap-4 rounded-xl border border-border bg-surface p-5 sm:grid-cols-4">
         <div>
           <div className="text-xs text-text-tertiary">Company</div>
-          <CompanyBadge containerNumber={shipment.containerNumber} />
+          <CompanyBadge containerNumber={shipment.containerNumber} country={shipment.country} />
         </div>
         <div>
           <div className="text-xs text-text-tertiary">Route</div>
@@ -81,7 +88,8 @@ export default async function ShipmentDetailPage({
           <ManufacturingProgressForm
             shipmentId={shipment.id}
             containerNumber={shipment.containerNumber}
-            steps={getRouteStepsForContainer(shipment.containerNumber)}
+            country={shipment.country}
+            steps={getRouteStepsForContainer(shipment.containerNumber, shipment.country)}
             milestones={shipment.milestones}
             currentUserName={user.fullName}
           />
@@ -93,7 +101,8 @@ export default async function ShipmentDetailPage({
           <ManualProgressForm
             shipmentId={shipment.id}
             containerNumber={shipment.containerNumber}
-            steps={getRouteStepsForContainer(shipment.containerNumber)}
+            country={shipment.country}
+            steps={getRouteStepsForContainer(shipment.containerNumber, shipment.country)}
             milestones={shipment.milestones}
             currentUserName={user.fullName}
           />
@@ -105,7 +114,8 @@ export default async function ShipmentDetailPage({
           <ContainerStageDurationsPanel
             shipmentId={shipment.id}
             containerNumber={shipment.containerNumber}
-            steps={getRouteStepsForContainer(shipment.containerNumber)}
+            country={shipment.country}
+            steps={getRouteStepsForContainer(shipment.containerNumber, shipment.country)}
             etd={shipment.etd}
             milestones={shipment.milestones}
           />

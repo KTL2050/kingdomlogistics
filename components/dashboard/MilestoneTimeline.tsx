@@ -24,7 +24,9 @@ const STEP_ICONS: Record<string, typeof Package> = {
   "On the High Seas": Ship,
   "Mombasa Port": Anchor,
   "Enroute to Kampala": Truck,
+  "Enroute to Nairobi": Truck,
   "At ICD": Home,
+  "At Nairobi Depot": Home,
   "Arrived at Store": Home,
 };
 
@@ -226,6 +228,7 @@ export function MilestoneTimeline({
         <MilestoneReasonModal
           shipmentId={shipment.id}
           containerNumber={shipment.containerNumber}
+          country={shipment.country}
           milestones={shipment.milestones}
           milestone={editingMilestone}
           currentUserName={currentUserName}

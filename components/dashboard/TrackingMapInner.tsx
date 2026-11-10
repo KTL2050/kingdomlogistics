@@ -11,7 +11,7 @@ import {
 } from "react-leaflet";
 import L from "leaflet";
 import { Locate, Minus, Plus } from "lucide-react";
-import type { Shipment } from "@/types";
+import type { Country, Shipment } from "@/types";
 
 // Fixed reference points for the trunk route. Store and ICD coordinates
 // are the exact ones pulled from the real Google Maps locations (Ntinda
@@ -21,7 +21,30 @@ const MOMBASA_PORT = { lat: -4.0435, lng: 39.6682, label: "Mombasa Port" };
 const KAMPALA_ICD = { lat: 0.3377893, lng: 32.6167942, label: "Multiple ICD" };
 const STORE = { lat: 0.3396837, lng: 32.623353, label: "Store — Ntinda Industrial, Kampala" };
 
+// Kenya's end of the route. These are placeholders in central Nairobi until
+// the real depot and store locations are known.
+const NAIROBI_DEPOT = { lat: -1.2864, lng: 36.8172, label: "Nairobi Depot (placeholder location)" };
+const NAIROBI_STORE = { lat: -1.2921, lng: 36.8219, label: "Store — Nairobi (placeholder location)" };
+
 type LatLng = { lat: number; lng: number };
+
+// Everything after Mombasa that differs by country: the depot stage's name
+// (Aiwibi routes have none, but the pin still marks where it would be), and
+// where the depot and store are.
+const DESTINATIONS = {
+  Uganda: {
+    depotStage: "At ICD",
+    depot: KAMPALA_ICD,
+    depotNote: "Inland Container Depot, Kampala",
+    store: STORE,
+  },
+  Kenya: {
+    depotStage: "At Nairobi Depot",
+    depot: NAIROBI_DEPOT,
+    depotNote: "Depot, Nairobi",
+    store: NAIROBI_STORE,
+  },
+} as const;
 
 function hasRealPosition(s: Shipment) {
   const { lat, lng } = s.position ?? {};
@@ -38,7 +61,10 @@ function hasRealPosition(s: Shipment) {
  * are the only signal available (Traqo has no visibility there, and
  * the inland leg has no equivalent waypoint data).
  */
-function buildRouteSegments(shipment: Shipment): {
+function buildRouteSegments(
+  shipment: Shipment,
+  dest: (typeof DESTINATIONS)[Country]
+): {
   traveled: [number, number][];
   remaining: [number, number][];
 } {
@@ -52,7 +78,7 @@ function buildRouteSegments(shipment: Shipment): {
   };
 
   const mombasaDone = isDone("Mombasa Port");
-  const icdDone = isDone("At ICD");
+  const icdDone = isDone(dest.depotStage);
   const storeDone = isDone("Arrived at Store");
 
   const toPairs = (points: LatLng[]) => points.map((p) => [p.lat, p.lng] as [number, number]);
@@ -75,7 +101,7 @@ function buildRouteSegments(shipment: Shipment): {
     const pos = hasRealPosition(shipment) ? { lat: shipment.position.lat, lng: shipment.position.lng } : lastStop;
     return {
       traveled: toPairs([origin, ...waypointPoints, pos]),
-      remaining: toPairs([pos, MOMBASA_PORT, KAMPALA_ICD, STORE]),
+      remaining: toPairs([pos, MOMBASA_PORT, dest.depot, dest.store]),
     };
   }
 
@@ -86,13 +112,13 @@ function buildRouteSegments(shipment: Shipment): {
   const remaining: LatLng[] = [];
 
   if (!icdDone) {
-    remaining.push(MOMBASA_PORT, KAMPALA_ICD, STORE);
+    remaining.push(MOMBASA_PORT, dest.depot, dest.store);
   } else {
-    traveled.push(KAMPALA_ICD);
+    traveled.push(dest.depot);
     if (!storeDone) {
-      remaining.push(KAMPALA_ICD, STORE);
+      remaining.push(dest.depot, dest.store);
     } else {
-      traveled.push(STORE);
+      traveled.push(dest.store);
     }
   }
 
@@ -222,22 +248,25 @@ function RecenterControl({ points }: { points: [number, number][] }) {
 
 export default function TrackingMapInner({
   shipments: allShipments,
+  country = "Uganda",
 }: {
   shipments: Shipment[];
+  country?: Country;
 }) {
   // A completed container has finished its journey, so it's left off the
   // map entirely — its route line, name tag, position dot, stop markers
-  // and legend entry. The shared Shekou/Mombasa/ICD/store pins stay.
+  // and legend entry. The shared Shekou/Mombasa/depot/store pins stay.
   const shipments = allShipments.filter((s) => s.health !== "completed");
+  const dest = DESTINATIONS[country];
 
   const trunkPoints: [number, number][] = useMemo(
     () => [
       [ORIGIN.lat, ORIGIN.lng],
       [MOMBASA_PORT.lat, MOMBASA_PORT.lng],
-      [KAMPALA_ICD.lat, KAMPALA_ICD.lng],
-      [STORE.lat, STORE.lng],
+      [dest.depot.lat, dest.depot.lng],
+      [dest.store.lat, dest.store.lng],
     ],
-    []
+    [dest]
   );
 
   const dotColor: Record<string, string> = {
@@ -279,7 +308,7 @@ export default function TrackingMapInner({
         />
 
         {shipments.map((s, idx) => {
-          const { traveled, remaining } = buildRouteSegments(s);
+          const { traveled, remaining } = buildRouteSegments(s, dest);
           const color = routeColor(idx);
           // Label sits partway along the last traveled segment, at a
           // different fraction per container so two containers sharing
@@ -331,20 +360,20 @@ export default function TrackingMapInner({
           </Popup>
         </Marker>
         <Marker
-          position={[KAMPALA_ICD.lat, KAMPALA_ICD.lng]}
+          position={[dest.depot.lat, dest.depot.lng]}
           icon={pinIcon("truck", "#2563eb")}
         >
           <Popup>
             <div className="text-xs">
-              <div className="font-semibold">{KAMPALA_ICD.label}</div>
-              <div className="text-text-tertiary">Inland Container Depot, Kampala</div>
+              <div className="font-semibold">{dest.depot.label}</div>
+              <div className="text-text-tertiary">{dest.depotNote}</div>
             </div>
           </Popup>
         </Marker>
-        <Marker position={[STORE.lat, STORE.lng]} icon={pinIcon("store", "#17864f")}>
+        <Marker position={[dest.store.lat, dest.store.lng]} icon={pinIcon("store", "#17864f")}>
           <Popup>
             <div className="text-xs">
-              <div className="font-semibold">{STORE.label}</div>
+              <div className="font-semibold">{dest.store.label}</div>
               <div className="text-text-tertiary">Final delivery point</div>
             </div>
           </Popup>

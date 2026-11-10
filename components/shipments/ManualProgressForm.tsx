@@ -6,7 +6,7 @@ import { Truck } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { checkDelay, buildDelayReason } from "@/lib/delay";
 import { detectStageIndex } from "@/lib/location-detect";
-import type { Milestone } from "@/types";
+import type { Country, Milestone } from "@/types";
 
 function shortDate(iso: string) {
   const d = new Date(iso);
@@ -21,12 +21,14 @@ function todayIso() {
 export function ManualProgressForm({
   shipmentId,
   containerNumber,
+  country,
   steps,
   milestones,
   currentUserName,
 }: {
   shipmentId: string;
   containerNumber: string;
+  country: Country;
   steps: readonly string[];
   milestones: Milestone[];
   currentUserName?: string;
@@ -210,6 +212,7 @@ export function ManualProgressForm({
     // mashed into one run-on sentence.
     const { error: alertError } = await supabase.from("alerts").insert({
       severity: isNewDelay ? "warning" : "info",
+      country,
       shipment_number: containerNumber,
       // Plain stage name, not "Delay at X" — the warning/info icon and
       // severity color already signal whether it's a delay; description

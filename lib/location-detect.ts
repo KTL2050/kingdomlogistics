@@ -14,6 +14,11 @@ const STAGE_KEYWORDS: Record<string, string[]> = {
     "on route", "on the road", "highway", "border", "malaba",
   ],
   "At ICD": ["icd", "inland container depot", "depot"],
+  "Enroute to Nairobi": [
+    "enroute", "en route", "nairobi", "transit", "transporting",
+    "on route", "on the road", "highway", "mombasa road",
+  ],
+  "At Nairobi Depot": ["depot", "icd", "inland container depot", "embakasi"],
   "Arrived at Store": ["store", "warehouse", "delivered", "destination", "ntinda"],
 };
 

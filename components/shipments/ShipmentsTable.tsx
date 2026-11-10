@@ -9,16 +9,18 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { CompanyBadge } from "@/components/ui/CompanyBadge";
 import { AddContainerModal } from "@/components/shipments/AddContainerModal";
 import { getCompanyForContainer } from "@/lib/utils";
-import type { Shipment } from "@/types";
+import { shipmentHref } from "@/lib/country";
+import type { Country, Shipment } from "@/types";
 
 const TABS = ["All", "On Time", "Delayed", "Not Started", "Completed"] as const;
-const COMPANY_TABS = ["All Companies", "Uncle Bills", "Aiwibi Uganda"] as const;
 
-export function ShipmentsTable({ shipments }: { shipments: Shipment[] }) {
+export function ShipmentsTable({ shipments, country }: { shipments: Shipment[]; country: Country }) {
   const [items, setItems] = useState(shipments);
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<(typeof TABS)[number]>("All");
-  const [companyTab, setCompanyTab] = useState<(typeof COMPANY_TABS)[number]>("All Companies");
+  // Aiwibi's name follows the country, so the company tabs do too.
+  const companyTabs = ["All Companies", "Uncle Bills", country === "Kenya" ? "Aiwibi Kenya" : "Aiwibi Uganda"];
+  const [companyTab, setCompanyTab] = useState<string>("All Companies");
   const [modalOpen, setModalOpen] = useState(false);
 
   const filtered = useMemo(() => {
@@ -32,7 +34,7 @@ export function ShipmentsTable({ shipments }: { shipments: Shipment[] }) {
 
       const matchesCompany =
         companyTab === "All Companies" ||
-        getCompanyForContainer(s.containerNumber) === companyTab;
+        getCompanyForContainer(s.containerNumber, s.country) === companyTab;
 
       const q = query.trim().toLowerCase();
       const matchesQuery =
@@ -50,11 +52,7 @@ export function ShipmentsTable({ shipments }: { shipments: Shipment[] }) {
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
         <div className="flex flex-wrap items-center gap-2">
           <FilterTabs options={[...TABS]} active={tab} onChange={(v) => setTab(v as (typeof TABS)[number])} />
-          <FilterTabs
-            options={[...COMPANY_TABS]}
-            active={companyTab}
-            onChange={(v) => setCompanyTab(v as (typeof COMPANY_TABS)[number])}
-          />
+          <FilterTabs options={companyTabs} active={companyTab} onChange={setCompanyTab} />
         </div>
         <div className="flex items-center gap-3">
           <SearchBar
@@ -90,7 +88,7 @@ export function ShipmentsTable({ shipments }: { shipments: Shipment[] }) {
               <tr key={s.id} className="border-b border-border last:border-b-0 hover:bg-page">
                 <td className="px-5 py-3.5">
                   <Link
-                    href={`/shipments/${s.containerNumber}`}
+                    href={shipmentHref(s)}
                     className="font-medium text-accent hover:underline"
                   >
                     {s.containerNumber}
@@ -98,7 +96,7 @@ export function ShipmentsTable({ shipments }: { shipments: Shipment[] }) {
                   <div className="text-xs text-text-tertiary">{s.shipmentNumber}</div>
                 </td>
                 <td className="px-5 py-3.5">
-                  <CompanyBadge containerNumber={s.containerNumber} />
+                  <CompanyBadge containerNumber={s.containerNumber} country={s.country} />
                 </td>
                 <td className="px-5 py-3.5 text-text-secondary">
                   {s.routeVia.join(" → ")}
@@ -134,6 +132,7 @@ export function ShipmentsTable({ shipments }: { shipments: Shipment[] }) {
         onClose={() => setModalOpen(false)}
         onAdd={(newShipment) => setItems((prev) => [newShipment, ...prev])}
         existingCodes={items.map((s) => s.containerNumber)}
+        country={country}
       />
     </div>
   );

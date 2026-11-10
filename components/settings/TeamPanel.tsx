@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Check, X } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
-import type { UserRole, UserStatus } from "@/types";
+import type { Country, UserRole, UserStatus } from "@/types";
 
 const ROLES: UserRole[] = ["Admin", "Logistics Manager", "Operations Officer", "Viewer"];
 
@@ -13,6 +13,32 @@ interface TeamMember {
   email: string | null;
   role: UserRole;
   status: UserStatus;
+  country: Country | null;
+}
+
+// "" = not fixed to a country.
+function CountrySelect({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: Country | null;
+  disabled: boolean;
+  onChange: (country: Country | null) => void;
+}) {
+  return (
+    <select
+      defaultValue={value ?? ""}
+      onChange={(e) => onChange(e.target.value === "" ? null : (e.target.value as Country))}
+      disabled={disabled}
+      aria-label="Country"
+      className="rounded-md border border-border px-2 py-1 text-[12.5px] disabled:opacity-50"
+    >
+      <option value="">Not fixed (can switch)</option>
+      <option value="Uganda">Uganda only</option>
+      <option value="Kenya">Kenya only</option>
+    </select>
+  );
 }
 
 const STATUS_STYLES: Record<UserStatus, string> = {
@@ -31,7 +57,7 @@ export function TeamPanel({ currentUserId }: { currentUserId: string }) {
     setLoading(true);
     const { data } = await supabase
       .from("users")
-      .select("id, full_name, email, role, status")
+      .select("id, full_name, email, role, status, country")
       .order("status", { ascending: true })
       .order("full_name", { ascending: true });
     setMembers((data as TeamMember[]) ?? []);
@@ -42,7 +68,10 @@ export function TeamPanel({ currentUserId }: { currentUserId: string }) {
     load();
   }, []);
 
-  async function updateMember(id: string, changes: Partial<Pick<TeamMember, "role" | "status">>) {
+  async function updateMember(
+    id: string,
+    changes: Partial<Pick<TeamMember, "role" | "status" | "country">>
+  ) {
     if (!supabase) return;
     setSavingId(id);
     await supabase.from("users").update(changes).eq("id", id);
@@ -58,6 +87,8 @@ export function TeamPanel({ currentUserId }: { currentUserId: string }) {
       <h2 className="text-[15px] font-semibold text-text-primary">Team members</h2>
       <p className="mt-1 text-[12.5px] text-text-secondary">
         Approve new signups and assign their role. Only Admins can see this panel.
+        A user fixed to one country sees only that country and gets no switch.
+        Viewers who aren&apos;t fixed see Uganda.
       </p>
 
       {loading ? (
@@ -96,6 +127,11 @@ export function TeamPanel({ currentUserId }: { currentUserId: string }) {
                           </option>
                         ))}
                       </select>
+                      <CountrySelect
+                        value={m.country}
+                        disabled={savingId === m.id}
+                        onChange={(country) => updateMember(m.id, { country })}
+                      />
                       <button
                         onClick={() => updateMember(m.id, { status: "approved" })}
                         disabled={savingId === m.id}
@@ -153,6 +189,11 @@ export function TeamPanel({ currentUserId }: { currentUserId: string }) {
                         </option>
                       ))}
                     </select>
+                    <CountrySelect
+                      value={m.country}
+                      disabled={savingId === m.id || m.id === currentUserId}
+                      onChange={(country) => updateMember(m.id, { country })}
+                    />
                   </div>
                 </div>
               ))}

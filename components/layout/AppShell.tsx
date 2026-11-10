@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { AppChrome } from "@/components/layout/AppChrome";
 import { PendingApproval } from "@/components/auth/PendingApproval";
-import { getAlerts, getCurrentUser, getPlannedOrders, getShipments } from "@/lib/data";
+import { getActiveCountry, getAlerts, getCurrentUser, getPlannedOrders, getShipments } from "@/lib/data";
 import { getDueSoonOrders } from "@/lib/order-planning";
 
 export async function AppShell({
@@ -27,10 +27,11 @@ export async function AppShell({
     return <PendingApproval email={user.email} />;
   }
 
-  const [allAlerts, plannedOrders, shipments] = await Promise.all([
+  const [allAlerts, plannedOrders, shipments, { country, canSwitch }] = await Promise.all([
     getAlerts(),
     getPlannedOrders(),
     getShipments(),
+    getActiveCountry(),
   ]);
   const unacknowledged = allAlerts.filter((a) => !a.acknowledged);
   const orderPlanningDueCount = getDueSoonOrders(plannedOrders).length;
@@ -46,6 +47,8 @@ export async function AppShell({
       orderPlanningDueCount={orderPlanningDueCount}
       headerAction={headerAction}
       shipments={shipments}
+      country={country}
+      canSwitchCountry={canSwitch}
     >
       {children}
     </AppChrome>

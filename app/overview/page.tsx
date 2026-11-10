@@ -6,6 +6,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { AlertsPanel } from "@/components/dashboard/AlertsPanel";
 import { getAlerts, getCurrentUser, getKpiSummary, getShipments } from "@/lib/data";
 import { canManageStageDurations } from "@/lib/utils";
+import { shipmentHref } from "@/lib/country";
 import Link from "next/link";
 
 export default async function OverviewPage() {
@@ -89,7 +90,7 @@ export default async function OverviewPage() {
             attention.map((s) => (
               <Link
                 key={s.id}
-                href={`/shipments/${s.containerNumber}`}
+                href={shipmentHref(s)}
                 className="flex items-center justify-between gap-3 border-b border-border px-5 py-3.5 last:border-b-0 hover:bg-page"
               >
                 <div>

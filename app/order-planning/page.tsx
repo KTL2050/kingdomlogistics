@@ -1,15 +1,16 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/AppShell";
 import { OrderPlanningView } from "@/components/order-planning/OrderPlanningView";
-import { getCurrentUser, getPlannedOrders, getShipments } from "@/lib/data";
+import { getActiveCountry, getCurrentUser, getPlannedOrders, getShipments } from "@/lib/data";
 
 const MANAGER_ROLES = ["Admin", "Logistics Manager", "Operations Officer"];
 
 export default async function OrderPlanningPage() {
-  const [plannedOrders, shipments, user] = await Promise.all([
+  const [plannedOrders, shipments, user, { country }] = await Promise.all([
     getPlannedOrders(),
     getShipments(),
     getCurrentUser(),
+    getActiveCountry(),
   ]);
 
   if (user?.role === "Viewer") redirect("/");
@@ -18,9 +19,11 @@ export default async function OrderPlanningPage() {
     <AppShell
       breadcrumb="Logistics / Order Planning"
       title="Order Planning"
-      subtitle="When Uncle Bills and Aiwibi Uganda need their next order placed"
+      subtitle={`When Uncle Bills and Aiwibi ${country} need their next order placed`}
     >
       <OrderPlanningView
+        key={country}
+        country={country}
         plannedOrders={plannedOrders}
         shipments={shipments}
         canManage={Boolean(user && MANAGER_ROLES.includes(user.role))}

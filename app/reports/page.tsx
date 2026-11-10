@@ -2,11 +2,15 @@ import { AppShell } from "@/components/layout/AppShell";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { ReportsCharts } from "@/components/reports/ReportsCharts";
 import { ExportButtons } from "@/components/reports/ExportButtons";
-import { getKpiSummary, getShipments } from "@/lib/data";
+import { getActiveCountry, getKpiSummary, getShipments } from "@/lib/data";
 import { Boxes, Clock, Percent, Timer } from "lucide-react";
 
 export default async function ReportsPage() {
-  const [shipments, kpi] = await Promise.all([getShipments(), getKpiSummary()]);
+  const [shipments, kpi, { country }] = await Promise.all([
+    getShipments(),
+    getKpiSummary(),
+    getActiveCountry(),
+  ]);
 
   const delayed = shipments.filter((s) => s.health === "delayed");
   const avgDelay =
@@ -21,9 +25,15 @@ export default async function ReportsPage() {
     <AppShell
       breadcrumb="Logistics / Reports"
       title="Reports"
-      subtitle="Performance analytics across your shipment network"
+      subtitle={`Performance analytics across your ${country} shipment network`}
     >
-      <ExportButtons shipments={shipments} kpi={kpi} avgDelay={avgDelay} avgTransit={avgTransit} />
+      <ExportButtons
+        shipments={shipments}
+        kpi={kpi}
+        avgDelay={avgDelay}
+        avgTransit={avgTransit}
+        country={country}
+      />
 
       <div id="reports-export-area" className="bg-page">
         <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-1 sm:grid sm:grid-cols-2 sm:overflow-visible sm:pb-0 xl:grid-cols-4">

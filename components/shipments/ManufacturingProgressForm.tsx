@@ -6,7 +6,7 @@ import { Factory } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { buildDelayReason, checkDelay } from "@/lib/delay";
 import { MANUFACTURING_STEP } from "@/lib/mock-data";
-import type { Milestone } from "@/types";
+import type { Country, Milestone } from "@/types";
 
 function shortDate(iso: string) {
   const d = new Date(iso);
@@ -21,12 +21,14 @@ function todayIso() {
 export function ManufacturingProgressForm({
   shipmentId,
   containerNumber,
+  country,
   steps,
   milestones,
   currentUserName,
 }: {
   shipmentId: string;
   containerNumber: string;
+  country: Country;
   steps: readonly string[];
   milestones: Milestone[];
   currentUserName?: string;
@@ -103,6 +105,7 @@ export function ManufacturingProgressForm({
 
     const { error: alertError } = await supabase.from("alerts").insert({
       severity: check.isDelayed ? "warning" : "info",
+      country,
       shipment_number: containerNumber,
       title: MANUFACTURING_STEP,
       description:

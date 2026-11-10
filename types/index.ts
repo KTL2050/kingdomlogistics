@@ -18,6 +18,8 @@ export type UserRole =
 
 export type AlertSeverity = "critical" | "warning" | "info";
 
+export type Country = "Uganda" | "Kenya";
+
 export type UserStatus = "pending" | "approved" | "rejected";
 
 export interface AppUser {
@@ -27,6 +29,8 @@ export interface AppUser {
   status: UserStatus;
   email?: string;
   avatarUrl?: string;
+  /** null/absent = not fixed to one country. */
+  country?: Country | null;
 }
 
 export interface GeoPoint {
@@ -71,6 +75,7 @@ export interface Shipment {
   routeVia: string[];
   shippingLine: string;
   containerSize: ContainerSize;
+  country: Country;
   mode: ShipmentMode;
   etd: string;
   eta: string;
@@ -93,6 +98,7 @@ export interface Shipment {
 export interface Alert {
   id: string;
   severity: AlertSeverity;
+  country: Country;
   shipmentNumber: string;
   title: string;
   description: string;
@@ -131,7 +137,8 @@ export type OrderFrequency = "monthly" | "quarterly" | "yearly" | "custom";
  */
 export interface PlannedOrder {
   id: string;
-  company: "Uncle Bills" | "Aiwibi Uganda";
+  country: Country;
+  company: "Uncle Bills" | "Aiwibi Uganda" | "Aiwibi Kenya";
   frequency: OrderFrequency;
   /** Only used when frequency === "custom": days between occurrences. */
   customIntervalDays?: number;

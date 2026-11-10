@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { MANUFACTURING_STEP, ROUTE_STEPS_ALL } from "@/lib/mock-data";
+import type { Country } from "@/types";
 
 interface StageDuration {
   id: string;
@@ -11,7 +12,7 @@ interface StageDuration {
   expected_days: number;
 }
 
-export function StageDurationsPanel() {
+export function StageDurationsPanel({ country }: { country: Country }) {
   const [rows, setRows] = useState<StageDuration[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -22,13 +23,13 @@ export function StageDurationsPanel() {
     async function load() {
       if (!supabase) return;
       setLoading(true);
-      const { data } = await supabase.from("stage_durations").select("*");
+      const { data } = await supabase.from("stage_durations").select("*").eq("country", country);
       const byName = new Map((data ?? []).map((r) => [r.step_name, r as StageDuration]));
 
-      // Always show every step from the full (Uncle Bills / ICD) route,
-      // in route order — Aiwibi Uganda's route is a subset of the same
-      // step names, so one ordered list covers both.
-      const ordered = ROUTE_STEPS_ALL.map(
+      // Always show every step from this country's full (Uncle Bills / depot)
+      // route, in route order — Aiwibi's route is a subset of the same step
+      // names, so one ordered list covers both.
+      const ordered = ROUTE_STEPS_ALL[country].map(
         (name) =>
           byName.get(name) ?? {
             id: name,
@@ -40,7 +41,7 @@ export function StageDurationsPanel() {
       setLoading(false);
     }
     load();
-  }, []);
+  }, [country]);
 
   function updateDays(stepName: string, days: number) {
     setSaved(false);
@@ -56,8 +57,8 @@ export function StageDurationsPanel() {
     setSaved(false);
 
     const { error } = await supabase.from("stage_durations").upsert(
-      rows.map((r) => ({ step_name: r.step_name, expected_days: r.expected_days })),
-      { onConflict: "step_name" }
+      rows.map((r) => ({ country, step_name: r.step_name, expected_days: r.expected_days })),
+      { onConflict: "country,step_name" }
     );
 
     setSaving(false);
@@ -70,7 +71,9 @@ export function StageDurationsPanel() {
 
   return (
     <div className="rounded-xl border border-border bg-surface p-5">
-      <h2 className="text-[15px] font-semibold text-text-primary">Default stage durations</h2>
+      <h2 className="text-[15px] font-semibold text-text-primary">
+        Default stage durations — {country}
+      </h2>
       <p className="mt-1 text-[12.5px] text-text-secondary">
         How many days a container is expected to spend at each stage by
         default. &quot;At ICD&quot; only applies to Uncle Bills containers —

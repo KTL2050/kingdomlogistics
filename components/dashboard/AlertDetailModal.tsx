@@ -4,6 +4,7 @@ import Link from "next/link";
 import { AlertCircle, AlertTriangle, Calendar, Info, X } from "lucide-react";
 import type { Alert } from "@/types";
 import { cn, severityStyles } from "@/lib/utils";
+import { shipmentHref } from "@/lib/country";
 
 const SEVERITY_ICON = {
   critical: AlertCircle,
@@ -86,7 +87,7 @@ export function AlertDetailModal({ alert, onClose }: { alert: Alert; onClose: ()
         <div className="mt-4 flex items-center justify-between gap-2">
           {alert.shipmentNumber ? (
             <Link
-              href={`/shipments/${alert.shipmentNumber}`}
+              href={shipmentHref({ containerNumber: alert.shipmentNumber, country: alert.country })}
               onClick={onClose}
               className="text-[12.5px] font-medium text-accent hover:underline"
             >

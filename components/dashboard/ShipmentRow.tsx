@@ -2,12 +2,15 @@ import Link from "next/link";
 import { ChevronRight, Ship, Truck, Home, AlertCircle, CheckCircle2, Package } from "lucide-react";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import type { Shipment } from "@/types";
-import { cn, getCompanyForContainer } from "@/lib/utils";
+import { cn, getCompanyForContainer, isAiwibiCompany } from "@/lib/utils";
+import { shipmentHref } from "@/lib/country";
 
 const STATUS_ICON: Record<string, typeof Ship> = {
   "On the High Seas": Ship,
   "Enroute to Kampala": Truck,
+  "Enroute to Nairobi": Truck,
   "At ICD": Home,
+  "At Nairobi Depot": Home,
   "Mombasa Port": Ship,
   "Order Placed": AlertCircle,
   "Manufacturing and Packaging": Package,
@@ -19,12 +22,12 @@ export function ShipmentRow({ shipment }: { shipment: Shipment }) {
   const Icon = STATUS_ICON[shipment.currentStatus] ?? AlertCircle;
   const iconTone =
     shipment.health === "delayed" ? "text-danger" : "text-success";
-  const company = getCompanyForContainer(shipment.containerNumber);
-  const codeColor = company === "Aiwibi Uganda" ? "text-indigo-600" : "text-accent";
+  const company = getCompanyForContainer(shipment.containerNumber, shipment.country);
+  const codeColor = isAiwibiCompany(company) ? "text-indigo-600" : "text-accent";
 
   return (
     <Link
-      href={`/shipments/${shipment.containerNumber}`}
+      href={shipmentHref(shipment)}
       className="flex items-center gap-2.5 border-b border-border px-4 py-2.5 last:border-b-0 hover:bg-page"
     >
       <div className="w-14 shrink-0">

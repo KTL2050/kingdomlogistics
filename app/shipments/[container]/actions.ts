@@ -10,7 +10,7 @@ import { buildDelayReason } from "@/lib/delay";
 import { buildWaypoints } from "@/lib/waypoints";
 import { alignMilestonesToRoute } from "@/lib/milestones";
 import { getCurrentUser, getShipments } from "@/lib/data";
-import type { Milestone } from "@/types";
+import type { Country, Milestone } from "@/types";
 
 // Index of the furthest stage the container has reached (or is at) — -1
 // if none. A stage that was reached late is "delayed", but it has still
@@ -95,17 +95,20 @@ async function syncShipmentTracking({
     // so a stale page or another route can't re-open its tracking.
     const { data: current } = await supabase
       .from("shipments")
-      .select("health")
+      .select("health, country")
       .eq("id", shipmentId)
       .single();
     if (current?.health === "completed") {
       return { error: "This container is complete — tracking is closed." };
     }
+    // Which country's route, default durations and overrides apply — the
+    // same code can exist in both countries.
+    const country: Country = (current?.country as Country | null) ?? "Uganda";
 
     const result =
       referenceType === "container"
-        ? await trackByContainer(reference)
-        : await trackByBillOfLading(reference);
+        ? await trackByContainer(reference, country)
+        : await trackByBillOfLading(reference, country);
 
     const { data: row } = await supabase
       .from("shipments")
@@ -113,7 +116,7 @@ async function syncShipmentTracking({
       .eq("id", shipmentId)
       .single();
 
-    const steps = getRouteStepsForContainer(containerNumber);
+    const steps = getRouteStepsForContainer(containerNumber, country);
     const existingMilestones = alignMilestonesToRoute(
       steps,
       (row?.milestones as Milestone[] | null) ?? []
@@ -122,7 +125,10 @@ async function syncShipmentTracking({
     // Stage Durations (set in Settings by Admin/Logistics Manager/
     // Operations Officer) is what actually computes "Planned" dates —
     // order-placed date plus each stage's expected days, cumulatively.
-    const { data: durationRows } = await supabase.from("stage_durations").select("*");
+    const { data: durationRows } = await supabase
+      .from("stage_durations")
+      .select("*")
+      .eq("country", country);
     const expectedDaysByStep: Record<string, number> = {};
     for (const d of durationRows ?? []) {
       expectedDaysByStep[d.step_name as string] = d.expected_days as number;
@@ -134,7 +140,8 @@ async function syncShipmentTracking({
     const { data: overrideRows } = await supabase
       .from("container_stage_durations")
       .select("*")
-      .eq("container_number", containerNumber);
+      .eq("container_number", containerNumber)
+      .eq("country", country);
     for (const d of overrideRows ?? []) {
       expectedDaysByStep[d.step_name as string] = d.expected_days as number;
     }
@@ -244,6 +251,7 @@ async function syncShipmentTracking({
     if (newDelay && delayReason) {
       const { error: alertError } = await supabase.from("alerts").insert({
         severity: "warning",
+        country,
         shipment_number: containerNumber,
         title: `Delay at ${newDelay.name}`,
         description: delayReason,
@@ -267,6 +275,7 @@ async function syncShipmentTracking({
       const { title, description } = describeStageReached(containerNumber, stageName, nextName);
       const { error: progressAlertError } = await supabase.from("alerts").insert({
         severity: "info",
+        country,
         shipment_number: containerNumber,
         title,
         description,

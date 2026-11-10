@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { ChatWidget } from "@/components/chat/ChatWidget";
-import type { Alert, Shipment } from "@/types";
+import type { Alert, Country, Shipment } from "@/types";
 
 export function AppChrome({
   breadcrumb,
@@ -16,6 +16,8 @@ export function AppChrome({
   orderPlanningDueCount = 0,
   headerAction,
   shipments,
+  country,
+  canSwitchCountry,
   children,
 }: {
   breadcrumb: string;
@@ -27,6 +29,8 @@ export function AppChrome({
   orderPlanningDueCount?: number;
   headerAction?: React.ReactNode;
   shipments: Shipment[];
+  country: Country;
+  canSwitchCountry: boolean;
   children: React.ReactNode;
 }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -71,10 +75,14 @@ export function AppChrome({
           onMenuClick={() => setMobileNavOpen(true)}
           headerAction={headerAction}
           shipments={shipments}
+          country={country}
+          canSwitchCountry={canSwitchCountry}
         />
         <main className="flex-1 px-4 py-4 sm:px-6">{children}</main>
       </div>
       <ChatWidget
+        key={country}
+        country={country}
         userName={userName}
         userRole={userRole}
         containers={shipments.map((s) => ({ number: s.containerNumber, status: s.currentStatus }))}

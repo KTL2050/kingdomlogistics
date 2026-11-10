@@ -700,3 +700,140 @@ $$;
 -- above is the real gate).
 revoke all on function agent_briefing_data(text) from public, anon, authenticated;
 grant execute on function agent_briefing_data(text) to anon;
+
+-- ---------------------------------------------------------------------
+-- Countries (Uganda / Kenya)
+-- The same container code can exist in both countries, so country is part
+-- of what identifies a container, its stage durations and its overrides.
+-- Everything that already exists becomes Uganda. Safe to run again.
+-- ---------------------------------------------------------------------
+
+alter table shipments add column if not exists country text not null default 'Uganda';
+alter table stage_durations add column if not exists country text not null default 'Uganda';
+alter table container_stage_durations add column if not exists country text not null default 'Uganda';
+-- null = not fixed to one country (Admin / Logistics Manager / Operations
+-- Officer can switch between them).
+alter table users add column if not exists country text;
+
+alter table shipments drop constraint if exists shipments_country_check;
+alter table shipments add constraint shipments_country_check check (country in ('Uganda', 'Kenya'));
+alter table stage_durations drop constraint if exists stage_durations_country_check;
+alter table stage_durations add constraint stage_durations_country_check check (country in ('Uganda', 'Kenya'));
+alter table container_stage_durations drop constraint if exists container_stage_durations_country_check;
+alter table container_stage_durations add constraint container_stage_durations_country_check check (country in ('Uganda', 'Kenya'));
+alter table users drop constraint if exists users_country_check;
+alter table users add constraint users_country_check check (country is null or country in ('Uganda', 'Kenya'));
+
+-- Drops a unique rule on exactly these columns, whatever it's called (the
+-- live database has drifted from this file, so the names can't be assumed).
+create or replace function pg_temp.drop_unique_on(tbl regclass, cols text[])
+returns void language plpgsql as $$
+declare r record;
+        wanted text[] := (select array_agg(x order by x) from unnest(cols) x);
+begin
+  for r in
+    select c.conname from pg_constraint c
+    where c.conrelid = tbl and c.contype = 'u'
+      and (select array_agg(a.attname::text order by a.attname::text)
+           from pg_attribute a where a.attrelid = c.conrelid and a.attnum = any (c.conkey)) = wanted
+  loop
+    execute format('alter table %s drop constraint %I', tbl, r.conname);
+  end loop;
+  for r in
+    select i.indexrelid::regclass::text as idx from pg_index i
+    where i.indrelid = tbl and i.indisunique and not i.indisprimary
+      and not exists (select 1 from pg_constraint c where c.conindid = i.indexrelid)
+      and (select array_agg(a.attname::text order by a.attname::text)
+           from pg_attribute a where a.attrelid = i.indrelid and a.attnum = any (i.indkey)) = wanted
+  loop
+    execute format('drop index %s', r.idx);
+  end loop;
+end $$;
+
+select pg_temp.drop_unique_on('public.shipments', array['container_number']);
+select pg_temp.drop_unique_on('public.stage_durations', array['step_name']);
+select pg_temp.drop_unique_on('public.container_stage_durations', array['container_number', 'step_name']);
+
+-- Uniqueness now includes the country.
+create unique index if not exists uq_shipments_country_container on shipments (country, container_number);
+create unique index if not exists uq_stage_durations_country_step on stage_durations (country, step_name);
+create unique index if not exists uq_container_stage_durations_country on container_stage_durations (container_number, country, step_name);
+
+-- Kenya starts with Uganda's days for the stages both share; the Nairobi
+-- stages start at 1 until they are set.
+insert into stage_durations (country, step_name, expected_days)
+select 'Kenya', step_name, expected_days from stage_durations
+where country = 'Uganda'
+  and step_name in ('Order Placed', 'Manufacturing and Packaging', 'Container Loaded',
+                    'On the High Seas', 'Mombasa Port', 'Arrived at Store')
+on conflict (country, step_name) do nothing;
+
+-- ---------------------------------------------------------------------
+-- Countries, part two: alerts, order planning and chat
+-- Everything that already exists becomes Uganda. Safe to run again.
+-- ---------------------------------------------------------------------
+
+alter table alerts add column if not exists country text not null default 'Uganda';
+alter table alerts drop constraint if exists alerts_country_check;
+alter table alerts add constraint alerts_country_check check (country in ('Uganda', 'Kenya'));
+
+alter table planned_orders add column if not exists country text not null default 'Uganda';
+alter table planned_orders drop constraint if exists planned_orders_country_check;
+alter table planned_orders add constraint planned_orders_country_check check (country in ('Uganda', 'Kenya'));
+
+-- The company list now allows 'Aiwibi Kenya'. Dropped by what it checks, not
+-- by name, because the live database has drifted from this file.
+do $$ declare r record; begin
+  for r in select conname from pg_constraint
+           where conrelid = 'public.planned_orders'::regclass and contype = 'c'
+             and pg_get_constraintdef(oid) like '%Aiwibi Uganda%'
+  loop execute format('alter table planned_orders drop constraint %I', r.conname); end loop;
+end $$;
+alter table planned_orders add constraint planned_orders_company_check
+  check (company in ('Uncle Bills', 'Aiwibi Uganda', 'Aiwibi Kenya'));
+
+-- Chat: separate room, threads and read markers per country.
+alter table chat_messages add column if not exists country text not null default 'Uganda';
+alter table chat_reads add column if not exists country text not null default 'Uganda';
+alter table chat_thread_reads add column if not exists country text not null default 'Uganda';
+alter table chat_messages drop constraint if exists chat_messages_country_check;
+alter table chat_messages add constraint chat_messages_country_check check (country in ('Uganda', 'Kenya'));
+create index if not exists idx_chat_messages_country on chat_messages (country, created_at desc);
+
+alter table chat_reads drop constraint if exists chat_reads_pkey;
+alter table chat_reads add primary key (user_id, country);
+alter table chat_thread_reads drop constraint if exists chat_thread_reads_pkey;
+alter table chat_thread_reads add primary key (user_id, country, container_number);
+
+-- "Does this container already have a conversation" is now per country. The
+-- policy that uses the function has to go first, then comes back.
+drop policy if exists "Approved users can post chat_messages" on chat_messages;
+drop function if exists chat_thread_exists(text);
+create or replace function chat_thread_exists(container text, p_country text)
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from chat_messages where container_number = container and country = p_country);
+$$;
+create policy "Approved users can post chat_messages"
+  on chat_messages for insert to authenticated with check (
+    user_id = auth.uid()
+    and exists (select 1 from users where users.id = auth.uid() and users.status = 'approved')
+    and (
+      container_number is null
+      or exists (select 1 from users where users.id = auth.uid() and users.role in ('Admin', 'Logistics Manager'))
+      or chat_thread_exists(container_number, country)
+    )
+  );
+
+-- The @ list: people who work in that country. A user with no country is
+-- everywhere, except Viewers, who stay on Uganda.
+drop function if exists chat_members();
+create or replace function chat_members(p_country text)
+returns table (id uuid, full_name text, role text)
+language sql stable security definer set search_path = public as $$
+  select u.id, u.full_name, u.role from users u
+  where u.status = 'approved'
+    and (u.country = p_country
+         or (u.country is null and (u.role <> 'Viewer' or p_country = 'Uganda')))
+    and exists (select 1 from users me where me.id = auth.uid() and me.status = 'approved')
+  order by u.full_name;
+$$;

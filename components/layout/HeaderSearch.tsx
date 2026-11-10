@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Search } from "lucide-react";
+import { shipmentHref } from "@/lib/country";
 import type { Shipment } from "@/types";
 
 export function HeaderSearch({ shipments }: { shipments: Shipment[] }) {
@@ -59,8 +60,8 @@ export function HeaderSearch({ shipments }: { shipments: Shipment[] }) {
       .slice(0, 8);
   }, [shipments, query, isOrderPlanning]);
 
-  function goToShipment(containerNumber: string) {
-    router.push(`/shipments/${containerNumber}`);
+  function goToShipment(shipment: Shipment) {
+    router.push(shipmentHref(shipment));
     setQuery("");
     setOpen(false);
   }
@@ -84,7 +85,7 @@ export function HeaderSearch({ shipments }: { shipments: Shipment[] }) {
   function handleKeyDownInput(e: React.KeyboardEvent<HTMLInputElement>) {
     if (isOrderPlanning) return;
     if (e.key === "Enter" && matches.length > 0) {
-      goToShipment(matches[0].containerNumber);
+      goToShipment(matches[0]);
     } else if (e.key === "Escape") {
       setOpen(false);
     }
@@ -120,7 +121,7 @@ export function HeaderSearch({ shipments }: { shipments: Shipment[] }) {
               {matches.map((s) => (
                 <button
                   key={s.id}
-                  onClick={() => goToShipment(s.containerNumber)}
+                  onClick={() => goToShipment(s)}
                   className="flex w-full flex-col items-start px-3.5 py-2 text-left hover:bg-page"
                 >
                   <span className="text-[12.5px] font-medium text-text-primary">

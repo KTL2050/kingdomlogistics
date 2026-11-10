@@ -1,7 +1,14 @@
 import { cn, companyBadgeStyles, getCompanyForContainer } from "@/lib/utils";
+import type { Country } from "@/types";
 
-export function CompanyBadge({ containerNumber }: { containerNumber: string }) {
-  const company = getCompanyForContainer(containerNumber);
+export function CompanyBadge({
+  containerNumber,
+  country = "Uganda",
+}: {
+  containerNumber: string;
+  country?: Country;
+}) {
+  const company = getCompanyForContainer(containerNumber, country);
   const style = companyBadgeStyles[company];
 
   return (

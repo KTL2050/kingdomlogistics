@@ -6,7 +6,7 @@ import { buildMilestones, getRouteStepsForContainer } from "@/lib/mock-data";
 import { getCompanyForContainer } from "@/lib/utils";
 import { computePlannedDates } from "@/lib/planning";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase/client";
-import type { ContainerSize, Shipment } from "@/types";
+import type { ContainerSize, Country, Shipment } from "@/types";
 
 const SIZES: ContainerSize[] = ["20ft", "40ft", "40ft HC", "45ft"];
 
@@ -20,7 +20,9 @@ const FALLBACK_DAYS: Record<string, number> = {
   "On the High Seas": 35,
   "Mombasa Port": 3,
   "Enroute to Kampala": 3,
+  "Enroute to Nairobi": 3,
   "At ICD": 1,
+  "At Nairobi Depot": 1,
   "Arrived at Store": 1,
 };
 
@@ -39,11 +41,14 @@ export function AddContainerModal({
   onClose,
   onAdd,
   existingCodes,
+  country,
 }: {
   open: boolean;
   onClose: () => void;
   onAdd: (shipment: Shipment) => void;
   existingCodes: string[];
+  /** The country being viewed — a new container is added to it. */
+  country: Country;
 }) {
   const [code, setCode] = useState("");
   const [size, setSize] = useState<ContainerSize>("40ft");
@@ -60,27 +65,28 @@ export function AddContainerModal({
     supabase
       .from("stage_durations")
       .select("*")
+      .eq("country", country)
       .then(({ data }) => {
         if (!data) return;
         const map: Record<string, number> = {};
         for (const d of data) map[d.step_name as string] = d.expected_days as number;
         setExpectedDays(map);
       });
-  }, []);
+  }, [country]);
 
   if (!open) return null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = code.trim().toUpperCase();
-    const company = getCompanyForContainer(trimmed);
+    const company = getCompanyForContainer(trimmed, country);
 
     if (!trimmed) {
       setError("Enter a container code.");
       return;
     }
     if (company === "Unknown") {
-      setError("Container code must start with C (Uncle Bills) or A (Aiwibi Uganda).");
+      setError(`Container code must start with C (Uncle Bills) or A (Aiwibi ${country}).`);
       return;
     }
     if (existingCodes.includes(trimmed)) {
@@ -93,7 +99,8 @@ export function AddContainerModal({
     }
 
     const finalEta = addDays(orderDate, 28);
-    const steps = getRouteStepsForContainer(trimmed);
+    const steps = getRouteStepsForContainer(trimmed, country);
+    const destination = country === "Kenya" ? "Nairobi" : "Kampala";
     const plannedSteps = computePlannedDates(steps, orderDate, expectedDays);
     const plans = steps.map((_, i) => ({
       planned: plannedSteps[i].plannedDate,
@@ -104,11 +111,13 @@ export function AddContainerModal({
 
     const shipment: Shipment = {
       id: `s-${trimmed.toLowerCase()}-${Date.now()}`,
-      shipmentNumber: `SHP-${trimmed}`,
+      // Kenya's number carries KE- so shipment numbers stay unique across countries.
+      shipmentNumber: country === "Kenya" ? `SHP-KE-${trimmed}` : `SHP-${trimmed}`,
       containerNumber: trimmed,
+      country,
       origin: "China",
-      destination: "Kampala",
-      routeVia: ["China", "Mombasa", "Kampala"],
+      destination,
+      routeVia: ["China", "Mombasa", destination],
       shippingLine: "TBD",
       containerSize: size,
       mode: "FCL",
@@ -134,6 +143,7 @@ export function AddContainerModal({
         .insert({
           shipment_number: shipment.shipmentNumber,
           container_number: shipment.containerNumber,
+          country: shipment.country,
           origin: shipment.origin,
           destination: shipment.destination,
           route_via: shipment.routeVia,
@@ -184,8 +194,8 @@ export function AddContainerModal({
           </button>
         </div>
         <p className="mt-1 text-[12.5px] text-text-secondary">
-          The company is detected automatically from the code — C for Uncle
-          Bills, A for Aiwibi Uganda.
+          Adding to {country}. The company is detected automatically from the
+          code — C for Uncle Bills, A for Aiwibi {country}.
         </p>
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-3.5">

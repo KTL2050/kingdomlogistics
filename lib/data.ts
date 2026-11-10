@@ -1,4 +1,7 @@
-import type { Alert, AppUser, KpiSummary, PlannedOrder, Shipment } from "@/types";
+import { cache } from "react";
+import { cookies } from "next/headers";
+import type { Alert, AppUser, Country, KpiSummary, PlannedOrder, Shipment } from "@/types";
+import { COUNTRY_COOKIE, parseCountry, resolveCountry } from "@/lib/country";
 import {
   alerts as mockAlerts,
   getRouteStepsForContainer,
@@ -32,6 +35,7 @@ function mapShipmentRow(row: Record<string, unknown>): Shipment {
     routeVia: Array.isArray(row.route_via) ? (row.route_via as string[]) : [],
     shippingLine: row.shipping_line as string,
     containerSize: row.container_size as Shipment["containerSize"],
+    country: (row.country as Country | null) ?? "Uganda",
     mode: row.mode as Shipment["mode"],
     etd: row.etd as string,
     eta: row.eta as string,
@@ -43,7 +47,7 @@ function mapShipmentRow(row: Record<string, unknown>): Shipment {
     customer: row.customer as string,
     position: (row.position as Shipment["position"]) ?? { lat: 0, lng: 0, label: "" },
     milestones: alignMilestonesToRoute(
-      getRouteStepsForContainer(row.container_number as string),
+      getRouteStepsForContainer(row.container_number as string, (row.country as Country | null) ?? "Uganda"),
       Array.isArray(row.milestones) ? (row.milestones as Shipment["milestones"]) : []
     ),
     waypoints: Array.isArray(row.waypoints) ? (row.waypoints as Shipment["waypoints"]) : [],
@@ -60,6 +64,7 @@ function mapAlertRow(row: Record<string, unknown>): Alert {
   return {
     id: row.id as string,
     severity: row.severity as Alert["severity"],
+    country: (row.country as Country | null) ?? "Uganda",
     shipmentNumber: (row.shipment_number as string | null) ?? "",
     title: row.title as string,
     description: row.description as string,
@@ -96,6 +101,7 @@ function mapAlertRow(row: Record<string, unknown>): Alert {
 function mapPlannedOrderRow(row: Record<string, unknown>): PlannedOrder {
   return {
     id: row.id as string,
+    country: (row.country as Country | null) ?? "Uganda",
     company: row.company as PlannedOrder["company"],
     frequency: row.frequency as PlannedOrder["frequency"],
     customIntervalDays: (row.custom_interval_days as number | null) ?? undefined,
@@ -112,12 +118,14 @@ function mapPlannedOrderRow(row: Record<string, unknown>): PlannedOrder {
 }
 
 export async function getPlannedOrders(): Promise<PlannedOrder[]> {
+  const { country: active } = await getActiveCountry();
   if (isSupabaseConfigured) {
     const supabase = await createServerSupabaseClient();
     if (supabase) {
       const { data, error } = await supabase
         .from("planned_orders")
         .select("*")
+        .eq("country", active)
         .order("anchor_date", { ascending: true });
 
       if (!error && data) {
@@ -129,16 +137,26 @@ export async function getPlannedOrders(): Promise<PlannedOrder[]> {
       }
     }
   }
-  return mockPlannedOrders;
+  return mockPlannedOrders.filter((o) => o.country === active);
 }
 
-export async function getShipments(): Promise<Shipment[]> {
+// The country this request is about: a user fixed to one country always gets
+// it; otherwise the link's country if given, else the saved switch choice.
+export const getActiveCountry = cache(async (requested?: Country | null) => {
+  const user = await getCurrentUser();
+  const saved = parseCountry((await cookies()).get(COUNTRY_COOKIE)?.value);
+  return resolveCountry(user, requested ?? saved);
+});
+
+export async function getShipments(country?: Country): Promise<Shipment[]> {
+  const { country: active } = await getActiveCountry(country);
   if (isSupabaseConfigured) {
     const supabase = await createServerSupabaseClient();
     if (supabase) {
       const { data, error } = await supabase
         .from("shipments")
         .select("*")
+        .eq("country", active)
         .order("eta", { ascending: true });
 
       if (!error && data) {
@@ -150,23 +168,28 @@ export async function getShipments(): Promise<Shipment[]> {
       }
     }
   }
-  return mockShipments;
+  return mockShipments.filter((s) => s.country === active);
 }
 
 export async function getShipmentByContainer(
-  containerNumber: string
+  containerNumber: string,
+  country?: Country
 ): Promise<Shipment | undefined> {
-  const all = await getShipments();
+  const all = await getShipments(country);
   return all.find((s) => s.containerNumber === containerNumber);
 }
 
 export async function getAlerts(): Promise<Alert[]> {
+  const { country: active } = await getActiveCountry();
   if (isSupabaseConfigured) {
     const supabase = await createServerSupabaseClient();
     if (supabase) {
       const { data, error } = await supabase
         .from("alerts")
         .select("*")
+        // The "new user awaiting approval" alerts belong to no country: they
+        // are admin-only and show whichever country the Admin is viewing.
+        .or(`country.eq.${active},admin_only.eq.true`)
         .order("created_at", { ascending: false });
 
       if (!error && data) return data.map(mapAlertRow);
@@ -179,7 +202,7 @@ export async function getAlerts(): Promise<Alert[]> {
       }
     }
   }
-  return mockAlerts;
+  return mockAlerts.filter((a) => a.country === active);
 }
 
 export async function getKpiSummary(): Promise<KpiSummary> {
@@ -227,6 +250,7 @@ export async function getCurrentUser(): Promise<AppUser | null> {
       role: profile.role as AppUser["role"],
       status: profile.status as AppUser["status"],
       email: (profile.email as string | null) ?? data.user.email,
+      country: (profile.country as Country | null) ?? null,
     };
   }
 

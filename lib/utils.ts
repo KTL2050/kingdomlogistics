@@ -1,5 +1,5 @@
 import { clsx, type ClassValue } from "clsx";
-import type { ShipmentHealth, AlertSeverity, MilestoneStatus } from "@/types";
+import type { ShipmentHealth, AlertSeverity, MilestoneStatus, Country } from "@/types";
 
 export function cn(...inputs: ClassValue[]) {
   return clsx(inputs);
@@ -105,13 +105,22 @@ export function formatUpdatedAt(date: Date = new Date()) {
  * the code itself rather than stored separately (one less thing for a
  * logistics manager to get out of sync when entering a new container).
  */
-export type CompanyName = "Uncle Bills" | "Aiwibi Uganda" | "Unknown";
+export type CompanyName = "Uncle Bills" | "Aiwibi Uganda" | "Aiwibi Kenya" | "Unknown";
 
-export function getCompanyForContainer(containerNumber: string): CompanyName {
+// Uncle Bills is the same name in both countries; Aiwibi's follows the
+// country the container belongs to.
+export function getCompanyForContainer(
+  containerNumber: string,
+  country: Country = "Uganda"
+): CompanyName {
   const prefix = containerNumber.trim().charAt(0).toUpperCase();
   if (prefix === "C") return "Uncle Bills";
-  if (prefix === "A") return "Aiwibi Uganda";
+  if (prefix === "A") return country === "Kenya" ? "Aiwibi Kenya" : "Aiwibi Uganda";
   return "Unknown";
+}
+
+export function isAiwibiCompany(company: CompanyName): boolean {
+  return company === "Aiwibi Uganda" || company === "Aiwibi Kenya";
 }
 
 type CompanyBadgeStyle = { text: string; bg: string };
@@ -120,6 +129,7 @@ type CompanyBadgeStyleMap = Record<CompanyName, CompanyBadgeStyle>;
 export const companyBadgeStyles: CompanyBadgeStyleMap = {
   "Uncle Bills": { text: "text-slate-600", bg: "bg-slate-100" },
   "Aiwibi Uganda": { text: "text-indigo-600", bg: "bg-indigo-50" },
+  "Aiwibi Kenya": { text: "text-indigo-600", bg: "bg-indigo-50" },
   Unknown: { text: "text-text-secondary", bg: "bg-page" },
 };
 

@@ -15,7 +15,7 @@ import {
   type OccurrenceStatus,
   type OrderPlanningTimeframe,
 } from "@/lib/order-planning";
-import type { PlannedOrder, Shipment } from "@/types";
+import type { Country, PlannedOrder, Shipment } from "@/types";
 
 const TIMEFRAMES: { value: OrderPlanningTimeframe; label: string }[] = [
   { value: "monthly", label: "This Month" },
@@ -23,7 +23,6 @@ const TIMEFRAMES: { value: OrderPlanningTimeframe; label: string }[] = [
   { value: "yearly", label: "This Year" },
   { value: "custom", label: "Custom" },
 ];
-const COMPANY_TABS = ["All Companies", "Uncle Bills", "Aiwibi Uganda"] as const;
 
 function shortDate(d: Date) {
   return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
@@ -62,16 +61,20 @@ export function OrderPlanningView({
   plannedOrders,
   shipments,
   canManage,
+  country,
 }: {
   plannedOrders: PlannedOrder[];
   shipments: Shipment[];
   canManage: boolean;
+  country: Country;
 }) {
+  // Aiwibi's name follows the country, so the company tabs do too.
+  const companyTabs = ["All Companies", "Uncle Bills", `Aiwibi ${country}`];
   const [items, setItems] = useState(plannedOrders);
   const searchParams = useSearchParams();
   const query = (searchParams.get("q") ?? "").trim().toLowerCase();
   const [timeframe, setTimeframe] = useState<OrderPlanningTimeframe>("monthly");
-  const [companyTab, setCompanyTab] = useState<(typeof COMPANY_TABS)[number]>("All Companies");
+  const [companyTab, setCompanyTab] = useState<string>("All Companies");
   const [customStart, setCustomStart] = useState(isoMonthStart());
   const [customEnd, setCustomEnd] = useState(isoMonthStart(3));
   const [exportError, setExportError] = useState<string | null>(null);
@@ -207,7 +210,12 @@ export function OrderPlanningView({
     <div className="space-y-4">
       <DueSoonBanner dueSoon={dueSoon} onPlaced={handlePlaced} />
 
-      {canManage && <ImportPlannedOrdersModal onImport={(orders) => setItems((prev) => [...orders, ...prev])} />}
+      {canManage && (
+        <ImportPlannedOrdersModal
+          country={country}
+          onImport={(orders) => setItems((prev) => [...orders, ...prev])}
+        />
+      )}
 
       <div className="rounded-xl border border-border bg-surface">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
@@ -219,11 +227,7 @@ export function OrderPlanningView({
                 setTimeframe(TIMEFRAMES.find((t) => t.label === label)?.value ?? "monthly")
               }
             />
-            <FilterTabs
-              options={[...COMPANY_TABS]}
-              active={companyTab}
-              onChange={(v) => setCompanyTab(v as (typeof COMPANY_TABS)[number])}
-            />
+            <FilterTabs options={companyTabs} active={companyTab} onChange={setCompanyTab} />
           </div>
           <div className="flex items-center gap-2">
             <button

@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import { Bell, ChevronDown, LogOut, Menu, Settings } from "lucide-react";
 import Link from "next/link";
 import { HeaderSearch } from "@/components/layout/HeaderSearch";
+import { CountrySwitch } from "@/components/layout/CountrySwitch";
 import { formatUpdatedAt } from "@/lib/utils";
 import { supabase } from "@/lib/supabase/client";
-import type { Alert, Shipment } from "@/types";
+import type { Alert, Country, Shipment } from "@/types";
 
 export function Header({
   breadcrumb,
@@ -19,6 +20,8 @@ export function Header({
   onMenuClick,
   headerAction,
   shipments,
+  country,
+  canSwitchCountry,
 }: {
   breadcrumb: string;
   title: string;
@@ -29,6 +32,8 @@ export function Header({
   onMenuClick?: () => void;
   headerAction?: React.ReactNode;
   shipments: Shipment[];
+  country: Country;
+  canSwitchCountry: boolean;
 }) {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -89,6 +94,8 @@ export function Header({
             <span className="h-1.5 w-1.5 rounded-full bg-success" />
             Last updated: {formatUpdatedAt()} EAT
           </div>
+
+          <CountrySwitch country={country} canSwitch={canSwitchCountry} />
 
           <HeaderSearch shipments={shipments} />
 

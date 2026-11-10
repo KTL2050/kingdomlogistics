@@ -1,5 +1,5 @@
-import type { Alert, Milestone, PlannedOrder, Shipment } from "@/types";
-import { getCompanyForContainer } from "@/lib/utils";
+import type { Alert, Country, Milestone, PlannedOrder, Shipment } from "@/types";
+import { getCompanyForContainer, isAiwibiCompany } from "@/lib/utils";
 
 // Uncle Bills containers clear through Kampala ICD (Inland Container
 // Depot) before reaching the store. Aiwibi Uganda containers go
@@ -28,23 +28,61 @@ export const ROUTE_STEPS_DIRECT = [
   "Arrived at Store",
 ] as const;
 
-// Every stage name any route can contain, in route order — for screens that
-// list stages without belonging to one container (default durations).
-export const ROUTE_STEPS_ALL = [
+// Kenya: same ocean leg, then Nairobi in place of Kampala. Uncle Bills goes
+// through a Nairobi depot first (like Kampala ICD); Aiwibi goes straight on.
+export const ROUTE_STEPS_KENYA_ICD = [
+  "Order Placed",
+  "Container Loaded",
+  "On the High Seas",
+  "Mombasa Port",
+  "Enroute to Nairobi",
+  "At Nairobi Depot",
+  "Arrived at Store",
+] as const;
+
+export const ROUTE_STEPS_KENYA_DIRECT = [
   "Order Placed",
   "Manufacturing and Packaging",
   "Container Loaded",
   "On the High Seas",
   "Mombasa Port",
-  "Enroute to Kampala",
-  "At ICD",
+  "Enroute to Nairobi",
   "Arrived at Store",
 ] as const;
 
-export function getRouteStepsForContainer(containerNumber: string): readonly string[] {
-  return getCompanyForContainer(containerNumber) === "Aiwibi Uganda"
-    ? ROUTE_STEPS_DIRECT
-    : ROUTE_STEPS_ICD;
+// Every stage name a country's routes can contain, in route order — for
+// screens that list stages without belonging to one container (default
+// durations).
+export const ROUTE_STEPS_ALL: Record<Country, readonly string[]> = {
+  Uganda: [
+    "Order Placed",
+    "Manufacturing and Packaging",
+    "Container Loaded",
+    "On the High Seas",
+    "Mombasa Port",
+    "Enroute to Kampala",
+    "At ICD",
+    "Arrived at Store",
+  ],
+  Kenya: [
+    "Order Placed",
+    "Manufacturing and Packaging",
+    "Container Loaded",
+    "On the High Seas",
+    "Mombasa Port",
+    "Enroute to Nairobi",
+    "At Nairobi Depot",
+    "Arrived at Store",
+  ],
+};
+
+export function getRouteStepsForContainer(
+  containerNumber: string,
+  country: Country = "Uganda"
+): readonly string[] {
+  const aiwibi = isAiwibiCompany(getCompanyForContainer(containerNumber, country));
+  if (country === "Kenya") return aiwibi ? ROUTE_STEPS_KENYA_DIRECT : ROUTE_STEPS_KENYA_ICD;
+  return aiwibi ? ROUTE_STEPS_DIRECT : ROUTE_STEPS_ICD;
 }
 
 export function buildMilestones(
@@ -70,7 +108,7 @@ export function buildMilestones(
   });
 }
 
-export const shipments: Shipment[] = [
+const mockShipments: Omit<Shipment, "country">[] = [
   {
     id: "s-c32",
     shipmentNumber: "SHP-1032",
@@ -459,7 +497,10 @@ export const shipments: Shipment[] = [
   },
 ];
 
-export const alerts: Alert[] = [
+// The bundled demo data is all Uganda.
+export const shipments: Shipment[] = mockShipments.map((s) => ({ ...s, country: "Uganda" as const }));
+
+const mockAlertRows: Omit<Alert, "country">[] = [
   {
     id: "al-1",
     severity: "critical",
@@ -507,12 +548,14 @@ export const alerts: Alert[] = [
   },
 ];
 
+export const alerts: Alert[] = mockAlertRows.map((a) => ({ ...a, country: "Uganda" as const }));
+
 // Recurring "when should the next order be placed" schedules per
 // company. anchorDate is one real occurrence the recurrence is computed
 // from (see lib/order-planning.ts) — it doesn't have to be in the
 // future. leadTimeDays is how far ahead of the computed due date the
 // daily reminder starts showing.
-export const plannedOrders: PlannedOrder[] = [
+const mockPlannedOrderRows: Omit<PlannedOrder, "country">[] = [
   {
     id: "po-1",
     company: "Uncle Bills",
@@ -551,6 +594,11 @@ export const plannedOrders: PlannedOrder[] = [
     active: true,
   },
 ];
+
+export const plannedOrders: PlannedOrder[] = mockPlannedOrderRows.map((o) => ({
+  ...o,
+  country: "Uganda" as const,
+}));
 
 export const currentUser = {
   id: "u-1",

@@ -1,9 +1,9 @@
 import { AppShell } from "@/components/layout/AppShell";
 import { ShipmentsTable } from "@/components/shipments/ShipmentsTable";
-import { getShipments } from "@/lib/data";
+import { getActiveCountry, getShipments } from "@/lib/data";
 
 export default async function ShipmentsPage() {
-  const shipments = await getShipments();
+  const [shipments, { country }] = await Promise.all([getShipments(), getActiveCountry()]);
 
   return (
     <AppShell
@@ -11,7 +11,7 @@ export default async function ShipmentsPage() {
       title="Shipments"
       subtitle="Search, filter, and manage every active shipment"
     >
-      <ShipmentsTable shipments={shipments} />
+      <ShipmentsTable key={country} shipments={shipments} country={country} />
     </AppShell>
   );
 }
