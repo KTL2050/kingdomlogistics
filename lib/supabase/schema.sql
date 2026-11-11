@@ -626,8 +626,11 @@ $$;
 -- Agent read access (Morning Shipment Briefing)
 -- ---------------------------------------------------------------------
 -- One read-only door for the briefing agent: agent_briefing_data(key)
--- returns the active containers and open alerts, only the fields the
--- briefing uses, as one JSON object. The caller proves itself with a key; only the key's
+-- returns, per country, the containers not yet at store (and those delivered
+-- in the last 2 days), the open alerts and the Logistics Managers' updates of
+-- the last 5 days, only the fields the briefing uses, as one JSON object.
+-- Whether a container number or Bill of Lading was entered is returned as
+-- yes/no, never the number. The caller proves itself with a key; only the key's
 -- SHA-256 hash is stored here, never the key itself. The function is
 -- stable, so Postgres refuses any insert, update or delete inside it.
 -- Revoke an agent by deleting its row in agent_keys.
@@ -665,19 +668,21 @@ begin
   return jsonb_build_object(
     'generated_at', now(),
     'shipments', coalesce((
-      select jsonb_agg((
+      select jsonb_agg(((
         select jsonb_object_agg(e.key, e.value)
         from jsonb_each(to_jsonb(s)) e
         where e.key = any (array[
-          'container_number', 'customer', 'current_status', 'health',
+          'country', 'container_number', 'customer', 'current_status', 'health',
           'etd', 'eta', 'final_eta', 'delay_days', 'milestones',
           'tracking_last_synced_at', 'updated_at',
           'origin', 'destination', 'shipping_line', 'container_size', 'mode',
-          'current_location', 'delay_reason'
+          'current_location', 'delay_reason', 'tracking_reference_type'
         ])
-      ) order by s.shipment_number)
+      ) || jsonb_build_object('has_tracking_reference',
+             coalesce(btrim(to_jsonb(s)->>'tracking_reference'), '') <> '')
+      ) order by s.country, s.shipment_number)
       from shipments s
-      where s.health in ('on_time', 'delayed')
+      where s.health in ('not_started', 'on_time', 'delayed')
          or (s.health = 'completed' and s.updated_at >= now() - interval '2 days')
     ), '[]'::jsonb),
     'alerts', coalesce((
@@ -685,11 +690,27 @@ begin
         select jsonb_object_agg(e.key, e.value)
         from jsonb_each(to_jsonb(a)) e
         where e.key = any (array[
-          'shipment_number', 'title', 'created_at', 'severity', 'description'
+          'country', 'shipment_number', 'title', 'created_at', 'severity', 'description'
         ])
       ) order by a.created_at)
       from alerts a
       where a.acknowledged = false
+    ), '[]'::jsonb),
+    -- A Logistics Manager's update (or a note added later) carries
+    -- manager_note_at; acknowledged or not, the last 5 days cover a weekend.
+    'updates', coalesce((
+      select jsonb_agg((
+        select jsonb_object_agg(e.key, e.value)
+        from jsonb_each(to_jsonb(a)) e
+        where e.key = any (array[
+          'country', 'shipment_number', 'title', 'description', 'severity',
+          'manager_note', 'manager_note_by', 'manager_note_at',
+          'expected_next_stage', 'expected_next_date'
+        ])
+      ) order by a.manager_note_at)
+      from alerts a
+      where (to_jsonb(a)->>'manager_note_at') is not null
+        and (to_jsonb(a)->>'manager_note_at')::timestamptz >= now() - interval '5 days'
     ), '[]'::jsonb)
   );
 end;
