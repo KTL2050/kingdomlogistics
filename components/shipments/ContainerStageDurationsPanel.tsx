@@ -85,7 +85,8 @@ export function ContainerStageDurationsPanel({
     setError(null);
     setSaved(false);
 
-    const toUpsert = rows.filter((r) => r.overrideDays !== null);
+    // The first row (Order Placed) is the starting point and has no number.
+    const toUpsert = rows.filter((r, i) => i > 0 && r.overrideDays !== null);
     const toClear = rows.filter((r) => r.overrideDays === null);
 
     if (toUpsert.length > 0) {
@@ -197,10 +198,10 @@ export function ContainerStageDurationsPanel({
         default shown as its placeholder.
       </p>
       <p className="mt-1 text-[12.5px] text-text-secondary">
-        Each number is how long the container is expected to stay at that
-        stage <span className="font-medium text-text-primary">before reaching the next one</span>.
-        So to set how long until it&apos;s loaded, change <em>Order Placed</em> — not
-        Container Loaded. The planned date under each stage updates as you type.
+        Each number is how many days it takes to{" "}
+        <span className="font-medium text-text-primary">reach that stage from the one before it</span>.
+        So to set how long until it&apos;s loaded, change <em>Container Loaded</em>.
+        The planned date under each stage updates as you type.
       </p>
 
       {loading ? (
@@ -217,28 +218,34 @@ export function ContainerStageDurationsPanel({
                   <div className="text-[13px] text-text-primary">{r.stepName}</div>
                   <div className="text-[11px] text-text-tertiary">
                     Planned {preview[i]?.plannedDate ?? "—"}
-                    {steps[i + 1] && <> · days until {steps[i + 1]}</>}
+                    {i === 0 ? <> · the order date</> : <> · days from {steps[i - 1]}</>}
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5">
-                  <input
-                    type="number"
-                    min={0}
-                    placeholder={String(r.defaultDays)}
-                    value={r.overrideDays ?? ""}
-                    onChange={(e) => updateOverride(r.stepName, e.target.value)}
-                    className="w-16 rounded-md border border-border px-2 py-1 text-right text-[12.5px] focus:border-accent focus:outline-none"
-                  />
-                  <span className="text-[12px] text-text-tertiary">days</span>
-                  {r.overrideDays !== null && (
-                    <button
-                      type="button"
-                      onClick={() => updateOverride(r.stepName, "")}
-                      title="Reset to default"
-                      className="flex h-6 w-6 items-center justify-center rounded-md text-text-tertiary hover:bg-page"
-                    >
-                      <RotateCcw className="h-3.5 w-3.5" />
-                    </button>
+                  {i === 0 ? (
+                    <span className="text-[12px] text-text-tertiary">1 day</span>
+                  ) : (
+                    <>
+                      <input
+                        type="number"
+                        min={0}
+                        placeholder={String(r.defaultDays)}
+                        value={r.overrideDays ?? ""}
+                        onChange={(e) => updateOverride(r.stepName, e.target.value)}
+                        className="w-16 rounded-md border border-border px-2 py-1 text-right text-[12.5px] focus:border-accent focus:outline-none"
+                      />
+                      <span className="text-[12px] text-text-tertiary">days</span>
+                      {r.overrideDays !== null && (
+                        <button
+                          type="button"
+                          onClick={() => updateOverride(r.stepName, "")}
+                          title="Reset to default"
+                          className="flex h-6 w-6 items-center justify-center rounded-md text-text-tertiary hover:bg-page"
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>

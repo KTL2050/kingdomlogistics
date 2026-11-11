@@ -14,15 +14,15 @@ const SIZES: ContainerSize[] = ["20ft", "40ft", "40ft HC", "45ft"];
 // configured yet (or Supabase isn't connected) — same figures used
 // across the sample data.
 const FALLBACK_DAYS: Record<string, number> = {
-  "Order Placed": 10,
-  "Manufacturing and Packaging": 1,
-  "Container Loaded": 2,
-  "On the High Seas": 35,
-  "Mombasa Port": 3,
+  "Order Placed": 1,
+  "Manufacturing and Packaging": 10,
+  "Container Loaded": 10,
+  "On the High Seas": 2,
+  "Mombasa Port": 35,
   "Enroute to Kampala": 3,
   "Enroute to Nairobi": 3,
-  "At ICD": 1,
-  "At Nairobi Depot": 1,
+  "At ICD": 3,
+  "At Nairobi Depot": 3,
   "Arrived at Store": 1,
 };
 

@@ -57,7 +57,8 @@ export function StageDurationsPanel({ country }: { country: Country }) {
     setSaved(false);
 
     const { error } = await supabase.from("stage_durations").upsert(
-      rows.map((r) => ({ country, step_name: r.step_name, expected_days: r.expected_days })),
+      // The first row (Order Placed) is the starting point and has no number.
+      rows.slice(1).map((r) => ({ country, step_name: r.step_name, expected_days: r.expected_days })),
       { onConflict: "country,step_name" }
     );
 
@@ -75,17 +76,17 @@ export function StageDurationsPanel({ country }: { country: Country }) {
         Default stage durations — {country}
       </h2>
       <p className="mt-1 text-[12.5px] text-text-secondary">
-        How many days a container is expected to spend at each stage by
+        How many days a container is expected to take to reach each stage by
         default. &quot;At ICD&quot; only applies to Uncle Bills containers —
         Aiwibi Uganda skips that step entirely. Any individual container
         can override these from its own detail page, so this is a
         fallback, not a fixed rule.
       </p>
       <p className="mt-1 text-[12.5px] text-text-secondary">
-        Each number is how long a container stays at that stage{" "}
-        <span className="font-medium text-text-primary">before reaching the next one</span> — so
-        how long until it&apos;s loaded is set on <em>Order Placed</em>, and the
-        sea voyage on <em>On the High Seas</em>.
+        Each number is how many days it takes to{" "}
+        <span className="font-medium text-text-primary">reach that stage from the one before it</span> — so
+        how long until it&apos;s loaded is set on <em>Container Loaded</em>, and the
+        sea voyage on <em>Mombasa Port</em>.
       </p>
 
       {loading ? (
@@ -103,23 +104,32 @@ export function StageDurationsPanel({ country }: { country: Country }) {
                   {r.step_name === MANUFACTURING_STEP && (
                     <div className="text-[11px] font-medium text-accent">Aiwibi Uganda only</div>
                   )}
-                  {rows[i + 1] && (
+                  {i === 0 ? (
+                    <div className="text-[11px] text-text-tertiary">Starting point — the order date</div>
+                  ) : (
                     <div className="text-[11px] text-text-tertiary">
-                      {rows[i + 1].step_name === MANUFACTURING_STEP
-                        ? `days until ${MANUFACTURING_STEP} (Aiwibi) or Container Loaded (Uncle Bills)`
-                        : `days until ${rows[i + 1].step_name}`}
+                      days from{" "}
+                      {r.step_name === "Container Loaded"
+                        ? `${rows[i - 1].step_name} (Uncle Bills) or ${MANUFACTURING_STEP} (Aiwibi)`
+                        : rows[i - 1].step_name}
                     </div>
                   )}
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5">
-                  <input
-                    type="number"
-                    min={0}
-                    value={r.expected_days}
-                    onChange={(e) => updateDays(r.step_name, Number(e.target.value))}
-                    className="w-16 rounded-md border border-border px-2 py-1 text-right text-[12.5px] focus:border-accent focus:outline-none"
-                  />
-                  <span className="text-[12px] text-text-tertiary">days</span>
+                  {i === 0 ? (
+                    <span className="text-[12px] text-text-tertiary">1 day</span>
+                  ) : (
+                    <>
+                      <input
+                        type="number"
+                        min={0}
+                        value={r.expected_days}
+                        onChange={(e) => updateDays(r.step_name, Number(e.target.value))}
+                        className="w-16 rounded-md border border-border px-2 py-1 text-right text-[12.5px] focus:border-accent focus:outline-none"
+                      />
+                      <span className="text-[12px] text-text-tertiary">days</span>
+                    </>
+                  )}
                 </div>
               </div>
             ))}

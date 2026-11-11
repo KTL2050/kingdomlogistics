@@ -11,12 +11,13 @@ export interface PlannedStep {
 }
 
 /**
- * Returns one planned-date + duration-label pair per step, computed by
- * starting at the order-placed date and adding each step's own expected
- * duration before moving to the next — so "Planned" for step i is the
- * order date plus the sum of every prior step's expected days, and its
- * duration label always reflects the CURRENT Stage Durations setting
- * (not whatever was configured when the container was first created).
+ * Returns one planned-date + duration-label pair per step. A step's number
+ * of days is how long it takes to REACH that step from the one before it,
+ * so "Planned" for step i is the previous step's planned date plus step i's
+ * own days. Order Placed is the starting point: its date is the order date,
+ * it is fixed at 1 day, and it moves nothing else. The duration label always
+ * reflects the CURRENT Stage Durations setting (not whatever was configured
+ * when the container was first created).
  * Falls back to 1 day for any step missing from the settings, so a gap
  * in configuration doesn't break the whole timeline.
  *
@@ -31,17 +32,16 @@ export function computePlannedDates(
   expectedDaysByStep: Record<string, number>
 ): PlannedStep[] {
   let cursor = new Date(orderPlacedIso);
-  const result: PlannedStep[] = [];
 
-  for (const step of steps) {
-    const days = expectedDaysByStep[step] ?? 1;
-    result.push({
+  return steps.map((step, i) => {
+    // The first step is the starting point: the order date itself, always
+    // "1 day". Every later step lands its own days after the previous one.
+    const days = i === 0 ? 1 : expectedDaysByStep[step] ?? 1;
+    if (i > 0) cursor = new Date(cursor.getTime() + days * 24 * 60 * 60 * 1000);
+    return {
       plannedDate: shortDate(cursor.toISOString()),
       plannedDateIso: cursor.toISOString(),
       durationLabel: `${days} day${days === 1 ? "" : "s"}`,
-    });
-    cursor = new Date(cursor.getTime() + days * 24 * 60 * 60 * 1000);
-  }
-
-  return result;
+    };
+  });
 }
